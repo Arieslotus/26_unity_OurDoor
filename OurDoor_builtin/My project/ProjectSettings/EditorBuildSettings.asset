@@ -9,7 +9,7 @@ EditorBuildSettings:
     path: Assets/Samples/XR Interaction Toolkit/2.6.4/Hands Interaction Demo/HandsDemoScene.unity
     guid: 3ff35cecbcc52cc42945cf531638a60a
   - enabled: 1
-    path: Assets/Resources/JP_School/Scene/SCHOOL.unity
+    path: Assets/Scenes/SCHOOL.unity
     guid: 61d51f8e970fd354b9ff79694c8cce81
   m_configObjects:
     Unity.XR.PXR.Settings: {fileID: 11400000, guid: cf9d5cad1169a9d43bbe2690c60dfb92, type: 2}
