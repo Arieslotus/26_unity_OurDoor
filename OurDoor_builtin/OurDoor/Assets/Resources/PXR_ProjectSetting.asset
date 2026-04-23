@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: PXR_ProjectSetting
   m_EditorClassIdentifier: 
   useContentProtect: 0
-  handTracking: 0
+  handTracking: 1
   adaptiveHand: 0
   highFrequencyHand: 0
   openMRC: 1
@@ -26,7 +26,7 @@ MonoBehaviour:
   latelatching: 0
   latelatchingDebug: 0
   enableSubsampled: 0
-  bodyTracking: 0
+  bodyTracking: 1
   adaptiveResolution: 0
   stageMode: 0
   videoSeeThrough: 0
@@ -47,7 +47,7 @@ MonoBehaviour:
   mrSafeguard: 0
   enableRecommendMSAA: 0
   recommendSubsamping: 0
-  recommendMSAA: 0
+  recommendMSAA: 1
   validationFFREnabled: 0
   validationETFREnabled: 0
   portalInited: 1
