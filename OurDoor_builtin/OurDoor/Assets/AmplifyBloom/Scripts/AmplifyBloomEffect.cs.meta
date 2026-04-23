@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 9b8c208e531a26a41a4629789f4a706a
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - m_maskTexture: {instanceID: 0}
+  - m_targetTexture: {instanceID: 0}
+  - m_lensDirtTexture: {instanceID: 0}
+  - m_lensStardurstTex: {instanceID: 0}
+  - m_bloomShader: {fileID: 4800000, guid: 4f39db24ff9a0484c9ea5c2fa1c86c1b, type: 3}
+  - m_finalCompositionShader: {fileID: 4800000, guid: 6e4f40cfbd18b3b469b5079288cea652,
+      type: 3}
+  executionOrder: 0
+  icon: {fileID: 2800000, guid: a01cbbdf250cc3f45a0f180140bb24e0, type: 3}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

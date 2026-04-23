@@ -1,0 +1,49 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+/// <summary>
+/// 管理不同玩家见的显示区别
+/// </summary>
+public enum PlayerType
+{
+    Outer = 1,
+    Inner = 0,
+}
+
+public class PlayersManager : MonoBehaviour
+{
+    [Header("设置")]
+    public PlayerType currentPlayerType = PlayerType.Outer;
+
+    public Transform VRParent;
+
+    [Header("门外 玩家")]
+    public PlayerText outerPlayerText;
+    public Transform outerPlayerPos;
+
+    [Header("门内 玩家")]
+    public PlayerText innerPlayerText;
+    public Transform innerPlayerPos;
+
+    private void Awake()
+    {
+        if(currentPlayerType == PlayerType.Outer)
+        {
+            VRParent.position = outerPlayerPos.position;
+            VRParent.rotation = outerPlayerPos.rotation;
+
+            outerPlayerText.gameObject.SetActive(true);
+            innerPlayerText.gameObject.SetActive(false);
+        }
+        else if(currentPlayerType == PlayerType.Inner)
+        {
+            VRParent.position = innerPlayerPos.position;
+            VRParent.rotation = innerPlayerPos.rotation;
+
+            outerPlayerText.gameObject.SetActive(false);
+            innerPlayerText.gameObject.SetActive(true);
+        }
+    }
+
+}

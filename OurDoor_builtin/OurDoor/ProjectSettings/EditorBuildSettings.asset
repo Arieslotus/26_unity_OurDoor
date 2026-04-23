@@ -8,9 +8,15 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Samples/XR Interaction Toolkit/2.6.4/Hands Interaction Demo/HandsDemoScene.unity
     guid: 3ff35cecbcc52cc42945cf531638a60a
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/SCHOOL.unity
     guid: 61d51f8e970fd354b9ff79694c8cce81
+  - enabled: 1
+    path: Assets/XYT/_Scene/Shop_VR.unity
+    guid: 344ded4138a4a664bb6bea30e8a15942
+  - enabled: 0
+    path: Assets/XYT/_Scene/Shop.unity
+    guid: d99c09e82ca41d84cb7c4e6bbf5ab0f8
   m_configObjects:
     Unity.XR.PXR.Settings: {fileID: 11400000, guid: cf9d5cad1169a9d43bbe2690c60dfb92, type: 2}
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: d8dda9f2ae04c2344850891cd4190e45, type: 2}

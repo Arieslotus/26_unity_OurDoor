@@ -8305,7 +8305,7 @@ MonoBehaviour:
   lipsyncTracking: 0
   lateLatching: 0
   latelatchingDebug: 0
-  bodyTracking: 0
+  bodyTracking: 1
   foveationLevel: -1
   adaptiveResolution: 0
   eyeFoveationLevel: -1
@@ -9028,6 +9028,10 @@ PrefabInstance:
     - target: {fileID: 7403072356416083904, guid: ed5fdb8d3e523e94ca6d8a239d40615a, type: 3}
       propertyPath: m_Name
       value: TableHandle
+      objectReference: {fileID: 0}
+    - target: {fileID: 7403072356416083929, guid: ed5fdb8d3e523e94ca6d8a239d40615a, type: 3}
+      propertyPath: m_PermittedDisplacementAxes
+      value: -1
       objectReference: {fileID: 0}
     - target: {fileID: 7403072356416083930, guid: ed5fdb8d3e523e94ca6d8a239d40615a, type: 3}
       propertyPath: m_RootOrder
