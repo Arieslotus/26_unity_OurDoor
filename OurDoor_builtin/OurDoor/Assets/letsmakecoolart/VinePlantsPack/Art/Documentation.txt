@@ -1,0 +1,61 @@
+- Universal Rendering Pipeline
+
+- 32 game-ready Vine Plants assets [*fbx / 1 texture atlas (*tga)]
+
+----------------
+
+Number of meshes - 32
+Minimum polygon count - 40 tris
+Maximum polygon count - 1250 tris
+
+Meshes:
+SM_Vine_Plant_Cap_A_01 - 690 tris
+SM_Vine_Plant_Climber_A_01 - 132 tris
+SM_Vine_Plant_Climber_A_02 - 186 tris
+SM_Vine_Plant_Climber_A_03 - 840 tris
+SM_Vine_Plant_Climber_A_04 - 716 tris
+SM_Vine_Plant_Climber_A_05 - 964 tris
+SM_Vine_Plant_Climber_A_06 - 414 tris
+SM_Vine_Plant_Climber_A_07 - 235 tris
+SM_Vine_Plant_Corner_A_01 - 371 tris
+SM_Vine_Plant_Corner_A_02 - 205 tris
+SM_Vine_Plant_Corner_B_01 - 383 tris
+SM_Vine_Plant_Flower_Corner_A_01 - 654 tris
+SM_Vine_Plant_Flower_Hanging_A_01 - 273 tris
+SM_Vine_Plant_Flower_Hanging_A_02 - 297 tris
+SM_Vine_Plant_Flower_Hanging_A_03 - 362 tris
+SM_Vine_Plant_Flower_Hanging_B_01 - 318 tris
+SM_Vine_Plant_Flower_Hanging_B_02 - 778 tris
+SM_Vine_Plant_Flower_Hanging_B_03 - 1250 tris
+SM_Vine_Plant_Hanging_A_01 - 40 tris
+SM_Vine_Plant_Hanging_A_02 - 72 tris
+SM_Vine_Plant_Hanging_A_03 - 172 tris
+SM_Vine_Plant_Hanging_A_04 - 52 tris
+SM_Vine_Plant_Hanging_A_05 - 243 tris
+SM_Vine_Plant_Hanging_A_06 - 179 tris
+SM_Vine_Plant_Hanging_A_07 - 276 tris
+SM_Vine_Plant_Hanging_B_01 - 197 tris
+SM_Vine_Plant_Hanging_B_02 - 576 tris
+SM_Vine_Plant_Hanging_B_03 - 468 tris
+SM_Vine_Plant_Hanging_B_04 - 787 tris
+SM_Vine_Plant_Horizontal_A_01 - 124 tris
+SM_Vine_Plant_Horizontal_A_02 - 237 tris
+SM_Vine_Plant_Horizontal_A_03 - 150 tris
+
+Textures:
+T_Vine_Plant - 2048x2048 *tga
+
+Number of textures - 4
+- AO
+- BaseColorOpacity
+- MetallicSmoothness
+- Normal
+
+UV mapping: Yes
+channel 1: overlapping
+channel 2: non-overlapping (for baking lightmaps)
+
+----------------
+
+Thank you for purchasing this pack!
+If you have any questions please write me on e-mail - letsmakecoolart@gmail.com
