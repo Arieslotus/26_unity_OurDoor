@@ -18,7 +18,7 @@ public class Level1Manager : MonoBehaviour
     public bool PowerOn { get; private set; }
     public bool LockOpened { get; private set; }
 
-    // 事件（重点）
+    // 事件
     public event Action OnPowerOn;
     public event Action OnPowerOff;
     public event Action OnPassWordFound;
