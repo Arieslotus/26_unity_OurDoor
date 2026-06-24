@@ -58,7 +58,7 @@ public class Level2AutoControl : MonoBehaviour
         // ©╙це
         if (auto_OpenDoor)
         {
-            StartCoroutine(AutoBuildBoxRoutine());
+            StartCoroutine(AutoOpenDoorRoutine());
         }
     }
 

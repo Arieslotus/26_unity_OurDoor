@@ -156,7 +156,7 @@ public class SchoolKey : MonoBehaviour
         if (grab != null)
             grab.enabled = true;
 
-        rb.isKinematic = false;
+        rb.isKinematic = true;
 
         if (trail != null) trail.gameObject.SetActive(false);
 
@@ -167,5 +167,9 @@ public class SchoolKey : MonoBehaviour
     {
         yield return new WaitForSeconds(2f);
         Level2Manager.Instance.SetKeyLandOnWall(); // **
+
+        yield return new WaitForSeconds(10f);
+
+        rb.isKinematic = false;
     }
 }

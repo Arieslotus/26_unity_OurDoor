@@ -9,6 +9,9 @@ EditorBuildSettings:
     path: Assets/Samples/XR Interaction Toolkit/2.6.4/Hands Interaction Demo/HandsDemoScene.unity
     guid: 3ff35cecbcc52cc42945cf531638a60a
   - enabled: 1
+    path: Assets/XYT/_Scene/Hutong_VR.unity
+    guid: 309713fd3cfd050439fab7399d3d3bac
+  - enabled: 0
     path: Assets/XYT/_Scene/School_VR.unity
     guid: 92424f06961a2a3409b760ff2c1d3856
   - enabled: 0

@@ -46,4 +46,17 @@ public class PlayersManager : MonoBehaviour
         }
     }
 
+    [ContextMenu("设置VR位置 Out")]
+    public void SetOut()
+    {
+        VRParent.position = outerPlayerPos.position;
+        VRParent.rotation = outerPlayerPos.rotation;
+    }
+
+    [ContextMenu("设置VR位置 iN")]
+    public void SetiN()
+    {
+        VRParent.position = innerPlayerPos.position;
+        VRParent.rotation = innerPlayerPos.rotation;
+    }
 }

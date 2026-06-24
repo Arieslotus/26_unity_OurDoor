@@ -1,7 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
+using System.Xml;
 using TMPro;
+using UnityEngine;
 
 public class PlayerText : MonoBehaviour
 {
@@ -64,6 +65,15 @@ public class PlayerText : MonoBehaviour
         tmpText.color = new Color(textColor.r, textColor.g, textColor.b, 0f);
         tmpText.alpha = 0f;
         tmpText.text = "";
+    }
+
+    public void SetTextInstant(string text)
+    {
+        isSpeaking = true;
+
+        tmpText.text = text;
+        tmpText.color = Color.white;
+        tmpText.alpha = 1f;
     }
 
     /// <summary>
