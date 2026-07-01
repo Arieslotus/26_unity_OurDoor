@@ -36,11 +36,7 @@ public class HutongDoorTrigger : MonoBehaviour
         // 3秒后锁消失
         yield return new WaitForSeconds(3f);
 
-        if (lockA != null)
-            lockA.SetActive(false);
-
-        if (lockB != null)
-            lockB.SetActive(false);
+        hideLock();
 
         // 再等1秒
         yield return new WaitForSeconds(1f);
@@ -54,10 +50,10 @@ public class HutongDoorTrigger : MonoBehaviour
 
     public void hideLock()
     {
-        if (lockA != null)
-            lockA.SetActive(false);
+        //if (lockA != null)
+        //    lockA.SetActive(false);
 
-        if (lockB != null)
-            lockB.SetActive(false);
+        //if (lockB != null)
+        //    lockB.SetActive(false);
     }
 }

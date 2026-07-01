@@ -57,7 +57,10 @@ public class L3PlayersTextManager : MonoBehaviour
         currentDialogueCoroutine = StartCoroutine(DialogueSequence(
 
             //("门外", "咚咚"),
-
+            () =>
+            {
+                Debug.Log("对话结束");
+            },
             ("门内", "外面有人？"),
 
             ("门外", "是我！我到门口了！"),
@@ -83,7 +86,10 @@ public class L3PlayersTextManager : MonoBehaviour
         StopAllSpeaking();
 
         currentDialogueCoroutine = StartCoroutine(DialogueSequence(
-
+            () =>
+            {
+                Debug.Log("对话结束");
+            },
             ("门内", "对的！"),
 
             ("门外", "开门吧！"),
@@ -111,7 +117,10 @@ public class L3PlayersTextManager : MonoBehaviour
         StopAllSpeaking();
 
         currentDialogueCoroutine = StartCoroutine(DialogueSequence(
-
+            () =>
+            {
+                Debug.Log("对话结束");
+            },
             ("门外", "我找到了这个！"),
 
             ("门外", "我从门底给你"),
@@ -131,7 +140,10 @@ public class L3PlayersTextManager : MonoBehaviour
         StopAllSpeaking();
 
         currentDialogueCoroutine = StartCoroutine(DialogueSequence(
-
+            () =>
+            {
+                Debug.Log("对话结束");
+            },
             ("门内", "我想想办法..."),
 
             ("门外", "试试能用它干什么"),
@@ -149,7 +161,10 @@ public class L3PlayersTextManager : MonoBehaviour
         StopAllSpeaking();
 
         currentDialogueCoroutine = StartCoroutine(DialogueSequence(
-
+            () =>
+            {
+                Debug.Log("对话结束");
+            },
             ("门外", "是铁丝！"),
 
             ("门内", "这里有个铁丝！"),
@@ -168,35 +183,54 @@ public class L3PlayersTextManager : MonoBehaviour
     {
         StopAllSpeaking();
 
-        currentDialogueCoroutine = StartCoroutine(DialogueSequence(
+        UILevelController.Instance.PlayStory(false); // *
 
-            ("门外", "终于开了！"),
+        WaitAndFadeIn();
 
-            ("门内", "快进来！"),
+        //currentDialogueCoroutine = StartCoroutine(DialogueSequence(
+        //    () =>
+        //    {
+        //        Debug.Log("最终对话结束");
 
-            ("门外", "我脚都站麻了..."),
+        //        UILevelController.Instance.FadeInGameHalf(); // *
+        //    },
 
-            ("门内", "哎呀，下次我肯定把钥匙收好。"),
+        //    //("门外", "终于开了！"),
+        //    ("门外", ""),
 
-            ("门外", "没事，反正你都会帮我开门的。"),
+        //    //("门内", "快进来！"),
+        //    ("门内", ""),
 
-            ("门内", "那当然！你可是我第一个请来家里玩的朋友！"),
+        //    //("门外", "我脚都站麻了..."),
+        //    ("门外", ""),
 
-            ("门外", "嘿嘿，走吧！快带我看你家有啥！"),
+        //    //("门内", "哎呀，下次我肯定把钥匙收好。"),
+        //    ("门内", ""),
 
-            ("门内", "来来来！保证你喜欢！")
-        ));
+        //    //("门外", "没事，反正你都会帮我开门的。"),
+        //    ("门外", ""),
+
+        //    //("门内", "那当然！你可是我第一个请来家里玩的朋友！"),
+        //    ("门内", ""),
+
+        //    //("门外", "嘿嘿，走吧！快带我看你家有啥！"),
+        //    ("门外", ""),
+
+        //    //("门内", "来来来！保证你喜欢！")
+        //    ("门内", "")
+        //));
+    }
+
+    void WaitAndFadeIn()
+    {
+        //yield return new WaitForSeconds(25f);
+        Debug.Log("最终对话结束");
+        UILevelController.Instance.FadeInGameHalf(25f); // *
     }
 
     //==================================================
     // 通用接口
     //==================================================
-
-    public void StartCustomDialogue(params (string speaker, string content)[] dialogues)
-    {
-        StopAllSpeaking();
-        currentDialogueCoroutine = StartCoroutine(DialogueSequence(dialogues));
-    }
 
     public void StopAllSpeaking()
     {
@@ -213,24 +247,25 @@ public class L3PlayersTextManager : MonoBehaviour
             innerPlayerText.StopSpeaking();
     }
 
-    private IEnumerator DialogueSequence(params (string speaker, string content)[] dialogues)
+    private IEnumerator DialogueSequence(System.Action onFinished = null, params (string speaker, string content)[] dialogues)
     {
         foreach (var dialogue in dialogues)
         {
+            // 根据说话者选择对应的 PlayerText
             PlayerText targetText = GetPlayerText(dialogue.speaker);
 
             if (targetText != null && targetText.gameObject.activeInHierarchy)
             {
                 targetText.StartSpeaking(false, dialogue.content);
-
                 yield return new WaitForSeconds(defaultSpeakDuration);
-
                 targetText.StopSpeaking();
-
                 yield return new WaitForSeconds(defaultInterval);
             }
         }
+        yield return new WaitForSeconds(3); // 最后一次对话后等待一段时间
+        onFinished?.Invoke();
     }
+
 
     private PlayerText GetPlayerText(string speaker)
     {

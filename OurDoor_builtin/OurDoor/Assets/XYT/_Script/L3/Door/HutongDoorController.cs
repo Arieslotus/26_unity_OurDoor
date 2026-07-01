@@ -22,6 +22,10 @@ public class HutongDoorController : MonoBehaviour
     Quaternion leftCloseRot;
     Quaternion rightCloseRot;
 
+    [Header("Ëø")]
+    public Rigidbody lockRig;
+    public Animator lacthAnimator;
+
     private void Awake()
     {
         leftCloseRot = doorL.localRotation;
@@ -43,10 +47,22 @@ public class HutongDoorController : MonoBehaviour
     {
         isOpening = true;
 
+        // Ëø
+        if (lockRig != null)
+            lockRig.isKinematic = false;
+
+        yield return new WaitForSeconds(1f);
+
+        if (lacthAnimator != null)
+            lacthAnimator.SetTrigger("Open");
+
+        yield return new WaitForSeconds(2f);
+
         // Á£×Ó
         if (ParticleRoot != null)
             ParticleRoot.SetActive(true);
 
+        // Ðý×ªÃÅ
         Quaternion leftTarget =
             leftCloseRot * Quaternion.Euler(0, leftOpenAngle, 0);
 
@@ -78,5 +94,7 @@ public class HutongDoorController : MonoBehaviour
 
         if (doorR != null)
             doorR.localRotation = rightTarget;
+
+       
     }
 }

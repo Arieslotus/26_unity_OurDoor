@@ -15,6 +15,9 @@ public class DoorOfShop : MonoBehaviour
     private Vector3 originalScale;
     private Vector3 targetScale;
 
+    [Header("Á£×Ó")]
+    public Transform particles;
+
     void Start()
     {
         // ¶©ÔÄÊÂ¼þ
@@ -24,7 +27,7 @@ public class DoorOfShop : MonoBehaviour
         originalScale = transform.localScale;
         targetScale = new Vector3(originalScale.x, 0.1f, originalScale.z);
 
-
+        particles.gameObject.SetActive(false);
     }
 
     private void OnDestroy()
@@ -46,6 +49,8 @@ public class DoorOfShop : MonoBehaviour
             return;
 
         StartCoroutine(OpenDoorAnimation());
+
+        particles.gameObject.SetActive(true);
     }
 
     private IEnumerator OpenDoorAnimation()

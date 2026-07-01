@@ -51,6 +51,10 @@ public class Level2PlayersTextManager : MonoBehaviour
         // 开始新对话
         // 门内是校内者，门外是校外者
         currentDialogueCoroutine = StartCoroutine(DialogueSequence(
+            () =>
+            {
+                Debug.Log("对话结束");
+            },
             ("门外", "喂，里面有人吗？"),
             ("门内", "谁啊？"),
             ("门外", "怎么是你！"),
@@ -78,6 +82,10 @@ public class Level2PlayersTextManager : MonoBehaviour
         StopAllSpeaking();
 
         currentDialogueCoroutine = StartCoroutine(DialogueSequence(
+            () =>
+            {
+                Debug.Log("对话结束");
+            },
             ("门外", "太棒了！"),
             ("门内", "找到了！"),
             ("门外", "你找到钥匙了！"),
@@ -97,6 +105,10 @@ public class Level2PlayersTextManager : MonoBehaviour
         StopAllSpeaking();
 
         currentDialogueCoroutine = StartCoroutine(DialogueSequence(
+            () =>
+            {
+                Debug.Log("对话结束");
+            },
             ("门外", "完了！"),
             ("门内", "完蛋了！"),
             ("门外", "钥匙落到墙上了！"),
@@ -117,7 +129,10 @@ public class Level2PlayersTextManager : MonoBehaviour
     {
         StopAllSpeaking();
 
-        currentDialogueCoroutine = StartCoroutine(DialogueSequence(
+        currentDialogueCoroutine = StartCoroutine(DialogueSequence(() =>
+        {
+            Debug.Log("对话结束");
+        },
             ("门外", "搭好了！"),
             ("门内", "太好了！"),
             ("门外", "等我上去拿钥匙开门"),
@@ -135,6 +150,13 @@ public class Level2PlayersTextManager : MonoBehaviour
         StopAllSpeaking();
 
         currentDialogueCoroutine = StartCoroutine(DialogueSequence(
+            () =>
+            {
+                Debug.Log("对话结束");
+
+                UILevelController.Instance.FadeInGame(); // *
+                UILevelController.Instance.PlayStory(false); // *
+            },
             ("门外", "我厉害吧！"),
             ("门内", "又见面了！朋友"),
             ("门外", "今天幸好有你在"),
@@ -146,15 +168,6 @@ public class Level2PlayersTextManager : MonoBehaviour
         ));
     }
 
-    /// <summary>
-    /// 自定义对话序列
-    /// </summary>
-    /// <param name="dialogues">对话数组，每个元素为 (说话者, 内容)</param>
-    public void StartCustomDialogue(params (string speaker, string content)[] dialogues)
-    {
-        StopAllSpeaking();
-        currentDialogueCoroutine = StartCoroutine(DialogueSequence(dialogues));
-    }
 
     /// <summary>
     /// 停止所有对话
@@ -178,7 +191,7 @@ public class Level2PlayersTextManager : MonoBehaviour
     /// <summary>
     /// 对话序列协程
     /// </summary>
-    private IEnumerator DialogueSequence(params (string speaker, string content)[] dialogues)
+    private IEnumerator DialogueSequence(System.Action onFinished = null, params (string speaker, string content)[] dialogues)
     {
         foreach (var dialogue in dialogues)
         {
@@ -193,6 +206,8 @@ public class Level2PlayersTextManager : MonoBehaviour
                 yield return new WaitForSeconds(defaultInterval);
             }
         }
+        yield return new WaitForSeconds(3); // 最后一次对话后等待一段时间
+        onFinished?.Invoke();
     }
 
     /// <summary>

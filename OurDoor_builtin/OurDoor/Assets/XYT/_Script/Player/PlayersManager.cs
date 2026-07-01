@@ -13,6 +13,8 @@ public enum PlayerType
 
 public class PlayersManager : MonoBehaviour
 {
+    public static PlayersManager Instance;
+
     [Header("设置")]
     public PlayerType currentPlayerType = PlayerType.Outer;
 
@@ -28,7 +30,15 @@ public class PlayersManager : MonoBehaviour
 
     private void Awake()
     {
-        if(currentPlayerType == PlayerType.Outer)
+        Instance = this;
+
+        // in or out
+        if (GameManager.Instance != null) // 运行时根据 GameManager 的设置决定，但编辑器内可以运行关卡场景手动控制
+        {
+            currentPlayerType = GameManager.Instance.CurrentPlayerRole == GameManager.PlayerRole.Outside ? PlayerType.Outer : PlayerType.Inner;
+        }
+
+        if (currentPlayerType == PlayerType.Outer)
         {
             VRParent.position = outerPlayerPos.position;
             VRParent.rotation = outerPlayerPos.rotation;

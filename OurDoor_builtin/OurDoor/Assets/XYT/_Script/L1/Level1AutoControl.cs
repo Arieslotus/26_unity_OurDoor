@@ -6,20 +6,47 @@ using UnityEngine;
 /// </summary>
 public class Level1AutoControl : MonoBehaviour
 {
+    public bool isAutoControl = false;
+
     [Header("恢复电力")]
-    public bool isAutoPowerOn = false;
+    bool isAutoPowerOn = false;
     public float timeUntilAutoPowerOn = -1f;
 
     [Header("找密码")]
-    public bool isAutoFindPassWord = false;
+    bool isAutoFindPassWord = false;
     public float timeUntilAutoFound = -1f;
 
     [Header("开锁")]
-    public bool isAutoLockOpen = false;
+    bool isAutoLockOpen = false;
     public float timeUntilAutoLockOpen = -1f;
 
+    private void Awake()
+    {
+        // is auto
+        if(GameManager.Instance != null) // 运行时根据 GameManager 的设置决定是否启用自动控制，但编辑器内可以运行关卡场景手动控制
+        {
+            isAutoControl = GameManager.Instance.IsLevelAutoControl();
+        }
+    }
     private void Start()
     {
+        // which auto
+        if(PlayersManager.Instance.currentPlayerType == PlayerType.Outer)
+        {
+            isAutoPowerOn = false;
+            isAutoFindPassWord = true;
+            isAutoLockOpen = false;
+        }
+        else if(PlayersManager.Instance.currentPlayerType == PlayerType.Inner)
+        {
+            isAutoPowerOn = true;
+            isAutoFindPassWord = false;
+            isAutoLockOpen = true;
+        }
+
+        if (!isAutoControl)
+            return;
+
         // 自动恢复电力
         if (isAutoPowerOn)
         {
@@ -54,7 +81,8 @@ public class Level1AutoControl : MonoBehaviour
         TriggerPowerOn();
     }
 
-    void TriggerPowerOn()
+    [ContextMenu("自动恢复电力")]
+    public void TriggerPowerOn()
     {
         Debug.Log("[AutoControl] 自动恢复电力");
         Level1Manager.Instance.SetPowerOn(true); // *
@@ -70,7 +98,6 @@ public class Level1AutoControl : MonoBehaviour
             yield return new WaitForSeconds(timeUntilAutoFound);
 
         }
-
 
         var screen = FindObjectOfType<TVScreen>();
         if (screen != null)
@@ -97,8 +124,13 @@ public class Level1AutoControl : MonoBehaviour
 
         }
 
-        Level1Manager.Instance.SetPassWordFound(); // *
+    }
 
+    [ContextMenu("自动找到密码")]
+    public void TriggerFindPassword()
+    {
+        Debug.Log("[AutoControl] 自动找到密码");
+        Level1Manager.Instance.SetPassWordFound(); // *
     }
 
     // =========================
@@ -118,7 +150,8 @@ public class Level1AutoControl : MonoBehaviour
         TriggerLockOpen();
     }
 
-    void TriggerLockOpen()
+    [ContextMenu("自动打开密码锁")]
+    public void TriggerLockOpen()
     {
         Debug.Log("[AutoControl] 自动打开密码锁");
         Level1Manager.Instance.SetLockOpened(); // *
