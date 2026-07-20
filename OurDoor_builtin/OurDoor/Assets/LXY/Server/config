@@ -1,0 +1,14 @@
+skynet_root = "$SKYNET_ROOT/"
+server_root = "$LXY_SERVER_ROOT/"
+
+thread = 4
+harbor = 0
+start = "main"
+bootstrap = "snlua bootstrap"
+logger = nil
+
+luaservice = server_root .. "service/?.lua;" .. skynet_root .. "service/?.lua"
+lualoader = skynet_root .. "lualib/loader.lua"
+lua_path = server_root .. "lualib/?.lua;" .. skynet_root .. "lualib/?.lua;" .. skynet_root .. "lualib/?/init.lua"
+lua_cpath = skynet_root .. "luaclib/?.so"
+cpath = skynet_root .. "cservice/?.so"

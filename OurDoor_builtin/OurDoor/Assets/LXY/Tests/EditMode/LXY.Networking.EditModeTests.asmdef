@@ -1,0 +1,21 @@
+{
+  "name": "LXY.Networking.EditModeTests",
+  "rootNamespace": "OurDoor.LXY.Networking.Tests",
+  "references": [
+    "LXY.Networking"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false,
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}
