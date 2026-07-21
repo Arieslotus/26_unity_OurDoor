@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Events;
 
 /// <summary>
 /// PC 可拾取物适配器。
@@ -38,6 +39,10 @@ public class PCPickupInteractable : MonoBehaviour, IPCInteractable
     [SerializeField] private bool ignorePlayerCollisionWhileHeld = true;
     private string interactionPrompt = "拿起";
 
+    [Header("事件")]
+    [SerializeField] public UnityEvent onPickedUp;
+    [SerializeField] public UnityEvent onDropped;
+
     [Header("运行时状态")]
     [SerializeField] private bool isHeld;
     [SerializeField] private float currentHoldDistance;
@@ -55,6 +60,8 @@ public class PCPickupInteractable : MonoBehaviour, IPCInteractable
     public string InteractionPrompt => interactionPrompt;
     public bool IsHeld => isHeld;
     public float CurrentHoldDistance => currentHoldDistance;
+
+
 
     private void Awake()
     {
@@ -114,6 +121,7 @@ public class PCPickupInteractable : MonoBehaviour, IPCInteractable
 
         SetPlayerCollisionIgnored(true);
         isHeld = true;
+        onPickedUp?.Invoke();
     }
 
     private void Update()
@@ -205,8 +213,7 @@ public class PCPickupInteractable : MonoBehaviour, IPCInteractable
 
     private static bool IsInteractHeld()
     {
-        return Mouse.current != null &&
-               Mouse.current.leftButton.isPressed;
+        return PCInteractor.WasInteractPressed();
     }
 
     private void SaveRigidbodyState()
@@ -259,6 +266,8 @@ public class PCPickupInteractable : MonoBehaviour, IPCInteractable
         isHeld = false;
         holdingCamera = null;
         playerController = null;
+
+        onDropped?.Invoke();
     }
 
     private void OnDisable()

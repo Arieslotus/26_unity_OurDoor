@@ -7,6 +7,7 @@ public class SchoolKey : MonoBehaviour
 {
     [Header("拾取")]
     private XRGrabInteractable grab;
+    private PCPickupInteractable pick;
     Rigidbody rb;
 
     private bool picked = false; // 已经从邮箱中拾取
@@ -33,8 +34,11 @@ public class SchoolKey : MonoBehaviour
         climb = FindObjectOfType<ClimbController>();
         rb = GetComponent<Rigidbody>();
         grab = GetComponent<XRGrabInteractable>();
-        grab.selectEntered.AddListener(OnGrab);
-        grab.selectExited.AddListener(OnRelease);
+        pick = GetComponent<PCPickupInteractable>();
+        grab?.selectEntered.AddListener(OnGrab);
+        grab?.selectExited.AddListener(OnRelease);
+        pick?.onPickedUp.AddListener(OnGrab);
+        pick?.onDropped.AddListener(OnRelease);
         if (grab == null) Debug.LogError("no XRGrabInteractable on key");
 
         if(trail != null) trail.gameObject.SetActive(false);
@@ -43,12 +47,18 @@ public class SchoolKey : MonoBehaviour
 
     void OnDestroy()
     {
-        grab.selectEntered.RemoveListener(OnGrab);
-        grab.selectExited.RemoveListener(OnRelease);
+        grab?.selectEntered.RemoveListener(OnGrab);
+        grab?.selectExited.RemoveListener(OnRelease);
+        pick?.onPickedUp.RemoveListener(OnGrab);
+        pick?.onDropped.RemoveListener(OnRelease);
     }
 
     // grab ---
     void OnGrab(SelectEnterEventArgs args)
+    {
+        OnGrab();
+    }
+    void OnGrab()
     {
         if (!picked)
         // in mail box
@@ -63,7 +73,7 @@ public class SchoolKey : MonoBehaviour
             // on wall
             if (hasThrown && !hasPickedFromWall)
             {
-                
+
                 if (climb != null)
                 {
                     hasPickedFromWall = true;
@@ -78,6 +88,7 @@ public class SchoolKey : MonoBehaviour
         }
 
     }
+
     IEnumerator Wait1()
     {
         yield return new WaitForSeconds(0.5f);
@@ -101,6 +112,10 @@ public class SchoolKey : MonoBehaviour
         lastPos = transform.position;
     }
     void OnRelease(SelectExitEventArgs args)
+    {
+        OnRelease();
+    }
+    void OnRelease()
     {
         if (velocity.y > 0.6f) /*edit*/ // 越小在vr中越容易抛出
         {

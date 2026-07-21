@@ -261,7 +261,7 @@ public class PCInteractor : MonoBehaviour
 
         // 按距离排序
         System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
-        int count = 2;
+        int count = 3;
 
         foreach (RaycastHit hit in hits)
         {
@@ -307,7 +307,7 @@ public class PCInteractor : MonoBehaviour
         canInteract = true;
         currentTargetType = InteractionTargetType.UI;
         currentTargetObject = button.gameObject;
-        interactionPrompt?.ShowPrompt(uiButtonPrompt);
+        //interactionPrompt?.ShowPrompt(uiButtonPrompt);
     }
 
     private void SetWorldTarget(
@@ -320,7 +320,7 @@ public class PCInteractor : MonoBehaviour
         currentTargetType = InteractionTargetType.WorldObject;
         currentTargetObject = targetObject;
         //Debug.Log($"interactionPrompt 的值是：{interactable.InteractionPrompt}");
-        interactionPrompt?.ShowPrompt(interactable.InteractionPrompt);
+        //interactionPrompt?.ShowPrompt(interactable.InteractionPrompt);
     }
 
     private void ClickUIButton(Button button)
@@ -339,7 +339,7 @@ public class PCInteractor : MonoBehaviour
         canInteract = false;
         currentTargetType = InteractionTargetType.None;
         currentTargetObject = null;
-        interactionPrompt?.HidePrompt();
+        //interactionPrompt?.HidePrompt();
     }
 
     private void DrawRuntimeRay()

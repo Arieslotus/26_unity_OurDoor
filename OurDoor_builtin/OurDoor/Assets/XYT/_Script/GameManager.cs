@@ -7,7 +7,7 @@ public class GameManager : MonoBehaviour
     public enum GameMode
     {
         SimulateTwoPlayer,   // 模拟双人
-        //TwoPlayer,           // 双人模式
+        TwoPlayer,           // 双人模式
         //SinglePlayer         // 单人模式
     }
 

@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 
-[RequireComponent(typeof(XRGrabInteractable))]
+//[RequireComponent(typeof(XRGrabInteractable))]
 [RequireComponent(typeof(Rigidbody))]
 
 // L2中校门外可被搭建的物体（纸箱，桌椅）
@@ -21,6 +21,7 @@ public class Box : MonoBehaviour
     public float throwSpeedThreshold = 2f;
 
     private XRGrabInteractable grab;
+    private PCPickupInteractable pick;
     private Rigidbody rb;
 
     private bool isGrabbed;
@@ -29,10 +30,14 @@ public class Box : MonoBehaviour
     {
         boxManager = FindObjectOfType<BoxManager>();
         grab = GetComponent<XRGrabInteractable>();
+        pick = GetComponent<PCPickupInteractable>();
         rb = GetComponent<Rigidbody>();
 
-        grab.selectEntered.AddListener(OnGrab);
-        grab.selectExited.AddListener(OnRelease);
+        grab?.selectEntered.AddListener(OnGrab);
+        grab?.selectExited.AddListener(OnRelease);
+        pick?.onPickedUp.AddListener(OnGrab);
+        pick?.onDropped.AddListener(OnRelease);
+
 
         if (trailObject != null)
             trailObject.SetActive(false);
@@ -40,11 +45,17 @@ public class Box : MonoBehaviour
 
     void OnDestroy()
     {
-        grab.selectEntered.RemoveListener(OnGrab);
-        grab.selectExited.RemoveListener(OnRelease);
+        grab?.selectEntered.RemoveListener(OnGrab);
+        grab?.selectExited.RemoveListener(OnRelease);
+        pick?.onPickedUp.RemoveListener(OnGrab);
+        pick?.onDropped.RemoveListener(OnRelease);
     }
 
     void OnGrab(SelectEnterEventArgs args)
+    {
+        OnGrab();
+    }
+    void OnGrab()
     {
         isGrabbed = true;
 
@@ -56,6 +67,10 @@ public class Box : MonoBehaviour
     }
 
     void OnRelease(SelectExitEventArgs args)
+    {
+        OnRelease();
+    }
+    void OnRelease()
     {
         isGrabbed = false;
 

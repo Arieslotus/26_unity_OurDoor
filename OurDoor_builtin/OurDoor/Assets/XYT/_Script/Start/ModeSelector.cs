@@ -8,7 +8,7 @@ public class ModeSelector : MonoBehaviour
     readonly string[] names =
     {
         "模拟双人",
-        //"双人模式",
+        "双人模式",
         //"单人模式"
     };
 

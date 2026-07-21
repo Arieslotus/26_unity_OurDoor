@@ -1,4 +1,5 @@
 using System.Collections;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -7,8 +8,8 @@ public class ClimbController : MonoBehaviour
     [Header("UI")]
     public Button climbButton;
 
-    [Header("XR")]
-    public Transform xrOrigin;
+    [Header("Player")]
+    Transform PlayerOrigin;
 
     [Header("Position")]
     public Transform climbPosition;
@@ -25,6 +26,8 @@ public class ClimbController : MonoBehaviour
 
     void Awake()
     {
+        PlayerOrigin = FindObjectOfType<PlayersManager>()?.VRParent;
+        if(PlayerOrigin == null) Debug.LogError("PlayersManager not found in the scene. Please ensure there is a PlayersManager in the scene.");
         if (climbButton != null)
         {
             climbButton.onClick.AddListener(ClickClimbUp);
@@ -68,7 +71,7 @@ public class ClimbController : MonoBehaviour
 
         yield return Fade(0, 1);
 
-        xrOrigin.position = climbPosition.position;
+        PlayerOrigin.position = climbPosition.position;
 
         yield return Fade(1, 0);
 
@@ -83,7 +86,7 @@ public class ClimbController : MonoBehaviour
 
         yield return Fade(0, 1);
 
-        xrOrigin.position = groundPosition.position;
+        PlayerOrigin.position = groundPosition.position;
 
         yield return Fade(1, 0);
 
