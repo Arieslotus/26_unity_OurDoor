@@ -26,6 +26,7 @@ public class WireExtractTrigger : MonoBehaviour
 
     [Header("完成后开启拾取")]
     XRGrabInteractable wireGrab;
+    PCPickupInteractable wirePick;
 
     [SerializeField] float currentProgressTime;
 
@@ -41,6 +42,7 @@ public class WireExtractTrigger : MonoBehaviour
 
         wireRb = wireTransform.GetComponent<Rigidbody>();
         wireGrab = wireTransform.GetComponent<XRGrabInteractable>();
+        wirePick = wireTransform.GetComponent<PCPickupInteractable>();
         if (wireRb != null)
         {
             wireRb.isKinematic = true;
@@ -50,6 +52,10 @@ public class WireExtractTrigger : MonoBehaviour
         if (wireGrab != null)
         {
             wireGrab.enabled = false;
+        }
+        if(wirePick != null)
+        {
+            wirePick.enabled = false;
         }
     }
 
@@ -137,6 +143,10 @@ public class WireExtractTrigger : MonoBehaviour
         if (wireGrab != null)
         {
             wireGrab.enabled = true;
+        }
+        if(wirePick != null)
+        {
+            wirePick.enabled = true;
         }
 
         L3Manager.Instance.SetWireFound();

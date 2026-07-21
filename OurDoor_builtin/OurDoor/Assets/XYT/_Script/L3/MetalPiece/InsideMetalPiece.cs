@@ -1,10 +1,11 @@
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 
-[RequireComponent(typeof(XRGrabInteractable))]
+//[RequireComponent(typeof(XRGrabInteractable))]
 public class InsideMetalPiece : MonoBehaviour
 {
     private XRGrabInteractable grab;
+    private PCPickupInteractable pick;
 
     private bool received = false;
     public bool isPicking { get; private set; }
@@ -12,20 +13,27 @@ public class InsideMetalPiece : MonoBehaviour
     private void Awake()
     {
         grab = GetComponent<XRGrabInteractable>();
+        pick = GetComponent<PCPickupInteractable>();
 
-        grab.selectEntered.AddListener(OnGrab);
+        pick?.onPickedUp.AddListener(OnGrab);
+        grab?.selectEntered.AddListener(OnGrab);
     }
 
     private void OnDestroy()
     {
         if (grab != null)
             grab.selectEntered.RemoveListener(OnGrab);
+        pick?.onPickedUp.RemoveListener(OnGrab);
     }
 
     private void OnGrab(SelectEnterEventArgs args)
     {
-        isPicking = true;
+        OnGrab();
+    }
 
+    private void OnGrab()
+    {
+        isPicking = true;
         if (!received)
         {
             received = true;
@@ -34,8 +42,6 @@ public class InsideMetalPiece : MonoBehaviour
 
             L3Manager.Instance.SetMetalPieceReceived();
         }
-
-
     }
 
     private void OnRelease(SelectExitEventArgs args)

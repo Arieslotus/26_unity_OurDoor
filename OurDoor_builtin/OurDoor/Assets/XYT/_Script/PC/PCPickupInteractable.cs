@@ -40,8 +40,8 @@ public class PCPickupInteractable : MonoBehaviour, IPCInteractable
     private string interactionPrompt = "拿起";
 
     [Header("事件")]
-    [SerializeField] public UnityEvent onPickedUp;
-    [SerializeField] public UnityEvent onDropped;
+    [HideInInspector] public UnityEvent onPickedUp;
+    [HideInInspector] public UnityEvent onDropped;
 
     [Header("运行时状态")]
     [SerializeField] private bool isHeld;

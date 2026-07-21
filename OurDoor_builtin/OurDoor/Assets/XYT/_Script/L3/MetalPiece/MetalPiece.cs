@@ -4,10 +4,11 @@ using UnityEngine.XR.Interaction.Toolkit;
 /// <summary>
 /// √≈Õ‚µƒÃ˙∆¨
 /// </summary>
-[RequireComponent(typeof(XRGrabInteractable))]
+//[RequireComponent(typeof(XRGrabInteractable))]
 public class MetalPiece : MonoBehaviour
 {
     private XRGrabInteractable grabInteractable;
+    private PCPickupInteractable pick;
 
     private bool hasPickedUp = false;
     public bool isPicking { get; private set; }
@@ -15,9 +16,12 @@ public class MetalPiece : MonoBehaviour
     private void Awake()
     {
         grabInteractable = GetComponent<XRGrabInteractable>();
+        pick = GetComponent<PCPickupInteractable>();
 
-        grabInteractable.selectEntered.AddListener(OnGrab);
-        grabInteractable.selectExited.AddListener(OnRelease);
+        pick?.onPickedUp.AddListener(OnGrab);
+        pick?.onDropped.AddListener(OnRelease);
+        grabInteractable?.selectEntered.AddListener(OnGrab);
+        grabInteractable?.selectExited.AddListener(OnRelease);
     }
 
     private void OnDestroy()
@@ -27,8 +31,14 @@ public class MetalPiece : MonoBehaviour
             grabInteractable.selectEntered.RemoveListener(OnGrab);
             grabInteractable.selectExited.RemoveListener(OnRelease);
         }
+        pick?.onPickedUp.RemoveListener(OnGrab);
+        pick?.onDropped.RemoveListener(OnRelease);
     }
     private void OnGrab(SelectEnterEventArgs args)
+    {
+        OnGrab();
+    }
+    private void OnGrab()
     {
         if (L3Manager.Instance.PasswordSuccess)
         {
@@ -45,8 +55,11 @@ public class MetalPiece : MonoBehaviour
         }
 
     }
-
     private void OnRelease(SelectExitEventArgs args)
+    {
+        OnRelease();
+    }
+    private void OnRelease()
     {
         isPicking = false;
     }

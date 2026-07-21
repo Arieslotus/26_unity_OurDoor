@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.InputSystem;
 
 /// <summary>
@@ -11,6 +12,10 @@ public class PCHingeDoorPullInteractable : MonoBehaviour, IPCInteractable
     [Header("引用")]
     [SerializeField] private Rigidbody targetRigidbody;
     [SerializeField] private Transform grabPoint;
+
+    [Header("事件")]
+    [HideInInspector] public UnityEvent onPickedUp;
+    [HideInInspector] public UnityEvent onDropped;
 
     [Header("拖拽物理")]
     [Min(0f)] [SerializeField] private float pullForce = 45f;
@@ -63,6 +68,7 @@ public class PCHingeDoorPullInteractable : MonoBehaviour, IPCInteractable
 
         isPulling = true;
         targetRigidbody.WakeUp();
+        onPickedUp?.Invoke();
     }
 
     private void FixedUpdate()
@@ -120,6 +126,7 @@ public class PCHingeDoorPullInteractable : MonoBehaviour, IPCInteractable
     {
         isPulling = false;
         pullingCamera = null;
+        onDropped?.Invoke();
     }
 
     private void OnDisable()
