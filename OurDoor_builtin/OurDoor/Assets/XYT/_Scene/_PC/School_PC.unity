@@ -9460,18 +9460,46 @@ PrefabInstance:
       propertyPath: m_Color.a
       value: 0.28235295
       objectReference: {fileID: 0}
+    - target: {fileID: 4449580850412849380, guid: bb777c5227ab0e046920e3c0ad0fb4b9, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4901191019409629046, guid: bb777c5227ab0e046920e3c0ad0fb4b9, type: 3}
+      propertyPath: m_UiScaleMode
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4901191019409629046, guid: bb777c5227ab0e046920e3c0ad0fb4b9, type: 3}
+      propertyPath: m_ReferenceResolution.x
+      value: 1920
+      objectReference: {fileID: 0}
+    - target: {fileID: 4901191019409629046, guid: bb777c5227ab0e046920e3c0ad0fb4b9, type: 3}
+      propertyPath: m_ReferenceResolution.y
+      value: 1080
+      objectReference: {fileID: 0}
     - target: {fileID: 6923664052890869427, guid: bb777c5227ab0e046920e3c0ad0fb4b9, type: 3}
       propertyPath: levelID
       value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 6923664052890869427, guid: bb777c5227ab0e046920e3c0ad0fb4b9, type: 3}
+      propertyPath: mainMenuScene
+      value: Start_PC
+      objectReference: {fileID: 0}
+    - target: {fileID: 6923664052890869427, guid: bb777c5227ab0e046920e3c0ad0fb4b9, type: 3}
       propertyPath: nextLevelScene
-      value: Hutong_VR
+      value: Hutong_PC
+      objectReference: {fileID: 0}
+    - target: {fileID: 7977795663939549396, guid: bb777c5227ab0e046920e3c0ad0fb4b9, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8778749884850361483, guid: bb777c5227ab0e046920e3c0ad0fb4b9, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 9162150568171482677, guid: bb777c5227ab0e046920e3c0ad0fb4b9, type: 3}
       propertyPath: m_Camera
       value: 
-      objectReference: {fileID: 1213185503}
+      objectReference: {fileID: 190599519}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

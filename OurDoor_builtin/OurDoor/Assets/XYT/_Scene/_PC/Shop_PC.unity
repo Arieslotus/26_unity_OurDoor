@@ -77507,6 +77507,12 @@ MonoBehaviour:
   rotationFollowSpeed: 12
   disableGravityWhileHeld: 1
   ignorePlayerCollisionWhileHeld: 1
+  onPickedUp:
+    m_PersistentCalls:
+      m_Calls: []
+  onDropped:
+    m_PersistentCalls:
+      m_Calls: []
   isHeld: 0
   currentHoldDistance: 0
 --- !u!1 &1814236900
@@ -105160,6 +105166,12 @@ MonoBehaviour:
   rotationFollowSpeed: 12
   disableGravityWhileHeld: 1
   ignorePlayerCollisionWhileHeld: 1
+  onPickedUp:
+    m_PersistentCalls:
+      m_Calls: []
+  onDropped:
+    m_PersistentCalls:
+      m_Calls: []
   isHeld: 0
   currentHoldDistance: 0
 --- !u!23 &1004840779861658181
@@ -160301,6 +160313,12 @@ MonoBehaviour:
   rotationFollowSpeed: 12
   disableGravityWhileHeld: 1
   ignorePlayerCollisionWhileHeld: 1
+  onPickedUp:
+    m_PersistentCalls:
+      m_Calls: []
+  onDropped:
+    m_PersistentCalls:
+      m_Calls: []
   isHeld: 0
   currentHoldDistance: 0
 --- !u!1 &6248574977231623406
@@ -162177,6 +162195,12 @@ MonoBehaviour:
   rotationFollowSpeed: 12
   disableGravityWhileHeld: 1
   ignorePlayerCollisionWhileHeld: 1
+  onPickedUp:
+    m_PersistentCalls:
+      m_Calls: []
+  onDropped:
+    m_PersistentCalls:
+      m_Calls: []
   isHeld: 0
   currentHoldDistance: 0
 --- !u!1 &6390542588645786537
@@ -175421,6 +175445,12 @@ MonoBehaviour:
   rotationFollowSpeed: 12
   disableGravityWhileHeld: 1
   ignorePlayerCollisionWhileHeld: 1
+  onPickedUp:
+    m_PersistentCalls:
+      m_Calls: []
+  onDropped:
+    m_PersistentCalls:
+      m_Calls: []
   isHeld: 0
   currentHoldDistance: 0
 --- !u!23 &7583768287426082889
@@ -184360,6 +184390,12 @@ MonoBehaviour:
   rotationFollowSpeed: 12
   disableGravityWhileHeld: 1
   ignorePlayerCollisionWhileHeld: 1
+  onPickedUp:
+    m_PersistentCalls:
+      m_Calls: []
+  onDropped:
+    m_PersistentCalls:
+      m_Calls: []
   isHeld: 0
   currentHoldDistance: 0
 --- !u!1 &8463768488683462342
@@ -191423,9 +191459,37 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 4449580850412849380, guid: bb777c5227ab0e046920e3c0ad0fb4b9, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4901191019409629046, guid: bb777c5227ab0e046920e3c0ad0fb4b9, type: 3}
+      propertyPath: m_UiScaleMode
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4901191019409629046, guid: bb777c5227ab0e046920e3c0ad0fb4b9, type: 3}
+      propertyPath: m_ReferenceResolution.x
+      value: 1920
+      objectReference: {fileID: 0}
+    - target: {fileID: 4901191019409629046, guid: bb777c5227ab0e046920e3c0ad0fb4b9, type: 3}
+      propertyPath: m_ReferenceResolution.y
+      value: 1080
+      objectReference: {fileID: 0}
+    - target: {fileID: 6923664052890869427, guid: bb777c5227ab0e046920e3c0ad0fb4b9, type: 3}
+      propertyPath: mainMenuScene
+      value: Start_PC
+      objectReference: {fileID: 0}
     - target: {fileID: 6923664052890869427, guid: bb777c5227ab0e046920e3c0ad0fb4b9, type: 3}
       propertyPath: nextLevelScene
-      value: School_VR
+      value: School_PC
+      objectReference: {fileID: 0}
+    - target: {fileID: 7977795663939549396, guid: bb777c5227ab0e046920e3c0ad0fb4b9, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8778749884850361483, guid: bb777c5227ab0e046920e3c0ad0fb4b9, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 9162150568171482677, guid: bb777c5227ab0e046920e3c0ad0fb4b9, type: 3}
       propertyPath: m_Camera
