@@ -1,4 +1,23 @@
-# LXY M2 Skynet 服务端
+# LXY M3 Skynet 服务端
+
+## M3 必需配置
+
+本项目不自动修改服务端配置。启动 M3 前，手动修改 `Server/Skynet/config`：
+
+```lua
+lxy_game_rule_module = "ourdoor.level_rules"
+```
+
+并在 `lua_path` 中加入 `games`：
+
+```lua
+lua_path = server_root .. "lualib/?.lua;"
+    .. server_root .. "games/?.lua;"
+    .. skynet_root .. "lualib/?.lua;"
+    .. skynet_root .. "lualib/?/init.lua"
+```
+
+缺少任一项时服务端会明确报错，不会退回硬编码规则。
 
 ## 启动
 
@@ -30,6 +49,7 @@ lxy_port = 8888
 ```sh
 ~/skynet/3rd/lua/lua Server/Skynet/tests/test_packet.lua
 ~/skynet/3rd/lua/lua Server/Skynet/tests/test_json.lua
+~/skynet/3rd/lua/lua Server/Skynet/tests/test_level_rules.lua
 ```
 
 通过标志：
@@ -37,6 +57,7 @@ lxy_port = 8888
 ```text
 LXY M1 Lua packet tests passed
 LXY M2 Lua JSON tests passed
+LXY M3 level rule tests passed
 ```
 
 ## M2 行为
@@ -52,3 +73,16 @@ LXY M2 Lua JSON tests passed
 
 退出清理和账号释放属于 M5。M2 期间重新运行相同测试时应使用新的
 guestId，或者重启 Skynet 服务端。
+
+## M3 行为
+
+- `LEVEL_ACTION=300`，请求必须携带房间、关卡、action、boolValue 和
+  `clientActionId`。
+- 第一关角色规则为：Outer 通电、Inner 发现密码、Outer 开锁。
+- 服务端拒绝错误成员、错误关卡、错误角色和不满足前置条件的操作。
+- 有效状态变化才执行 `revision + 1` 并向两端广播完整快照。
+- 合法但没有状态变化的操作不增加 revision。
+- 每个房间缓存最近 64 个 `clientActionId`；重复 ID 返回成功和
+  `duplicate=true`，不再次改变状态。
+- 通用房间服务通过 `game_rule` 调用 `games/ourdoor`，其他项目可替换
+  `lxy_game_rule_module` 使用自己的规则模块。

@@ -128,16 +128,78 @@ namespace OurDoor.LXY.Networking.Session
             RaiseChanged();
         }
 
+        public void ApplyLevelChanged(LevelChangedDto changed)
+        {
+            if (changed == null)
+                throw new ArgumentNullException(nameof(changed));
+            RequireState(OnlineSessionState.Playing, "处理 LEVEL_CHANGED");
+            RequireText(changed.roomId, nameof(changed.roomId));
+            RequireText(changed.role, nameof(changed.role));
+            if (!string.Equals(RoomId, changed.roomId, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"[网络会话] LEVEL_CHANGED 房间不一致，" +
+                    $"本地={RoomId}, 服务端={changed.roomId}。");
+            }
+            if (changed.fromLevelId != LevelId)
+            {
+                throw new InvalidOperationException(
+                    $"[网络会话] LEVEL_CHANGED 起始关卡不一致，" +
+                    $"本地={LevelId}, 服务端={changed.fromLevelId}。");
+            }
+            if (changed.toLevelId != changed.fromLevelId + 1 ||
+                changed.toLevelId < 2 ||
+                changed.toLevelId > 3)
+            {
+                throw new InvalidOperationException(
+                    $"[网络会话] LEVEL_CHANGED 目标关卡非法，" +
+                    $"from={changed.fromLevelId}, to={changed.toLevelId}。");
+            }
+            if (!string.Equals(Role, changed.role, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"[网络会话] LEVEL_CHANGED 角色不一致，" +
+                    $"本地={Role}, 服务端={changed.role}。");
+            }
+            if (changed.revision <= Revision)
+            {
+                throw new InvalidOperationException(
+                    $"[网络会话] LEVEL_CHANGED revision 未前进，" +
+                    $"本地={Revision}, 服务端={changed.revision}。");
+            }
+            if (changed.snapshot == null)
+                throw new InvalidOperationException("[网络会话] LEVEL_CHANGED 缺少完整快照。");
+            if (changed.snapshot.revision != changed.revision)
+            {
+                throw new InvalidOperationException(
+                    $"[网络会话] LEVEL_CHANGED 与快照 revision 不一致，" +
+                    $"push={changed.revision}, snapshot={changed.snapshot.revision}。");
+            }
+
+            ValidateSnapshot(changed.snapshot, changed.toLevelId);
+            LevelId = changed.toLevelId;
+            Revision = changed.revision;
+            Snapshot = changed.snapshot;
+            State = OnlineSessionState.LoadingLevel;
+            RaiseChanged();
+        }
+
         private void ValidateSnapshot(RoomSnapshotDto snapshot)
+        {
+            ValidateSnapshot(snapshot, LevelId);
+        }
+
+        private void ValidateSnapshot(RoomSnapshotDto snapshot, int expectedLevelId)
         {
             RequireText(snapshot.roomId, nameof(snapshot.roomId));
             RequireText(snapshot.phase, nameof(snapshot.phase));
             if (!string.Equals(RoomId, snapshot.roomId, StringComparison.Ordinal))
                 throw new InvalidOperationException(
                     $"[网络会话] 快照房间不一致，本地={RoomId}, 服务端={snapshot.roomId}。");
-            if (LevelId != snapshot.levelId)
+            if (expectedLevelId != snapshot.levelId)
                 throw new InvalidOperationException(
-                    $"[网络会话] 快照关卡不一致，本地={LevelId}, 服务端={snapshot.levelId}。");
+                    $"[网络会话] 快照关卡不一致，" +
+                    $"期望={expectedLevelId}, 服务端={snapshot.levelId}。");
             if (snapshot.revision < 0)
                 throw new InvalidOperationException(
                     $"[网络会话] 快照 revision 非法：{snapshot.revision}。");

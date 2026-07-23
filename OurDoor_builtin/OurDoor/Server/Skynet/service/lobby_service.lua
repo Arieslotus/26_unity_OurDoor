@@ -1,5 +1,5 @@
 --- <summary>
---- 实现功能：提供创建和加入房间的通用大厅入口，并统一转发给房间服务。
+--- 实现功能：提供房间及关卡操作的通用大厅入口，并统一转发给房间服务。
 --- </summary>
 local skynet = require "skynet"
 
@@ -25,6 +25,41 @@ function command.JOIN_ROOM(account, agent, room_id)
         account,
         agent,
         room_id
+    )
+end
+
+function command.SUBMIT_LEVEL_ACTION(
+    account,
+    agent,
+    room_id,
+    level_id,
+    action,
+    bool_value,
+    client_action_id
+)
+    return skynet.call(
+        room_service,
+        "lua",
+        "SUBMIT_LEVEL_ACTION",
+        account,
+        agent,
+        room_id,
+        level_id,
+        action,
+        bool_value,
+        client_action_id
+    )
+end
+
+function command.READY_NEXT_LEVEL(account, agent, room_id, level_id)
+    return skynet.call(
+        room_service,
+        "lua",
+        "READY_NEXT_LEVEL",
+        account,
+        agent,
+        room_id,
+        level_id
     )
 end
 

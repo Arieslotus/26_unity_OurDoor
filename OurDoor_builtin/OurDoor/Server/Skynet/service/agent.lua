@@ -1,5 +1,5 @@
 --- <summary>
---- 实现功能：管理单个 TCP 连接，处理心跳、临时登录、房间请求与串行服务端推送。
+--- 实现功能：管理单个 TCP 连接，处理登录、房间、关卡操作请求与串行服务端推送。
 --- </summary>
 local skynet = require "skynet"
 local socket = require "skynet.socket"
@@ -194,11 +194,70 @@ local function handle_join_room(envelope)
     send_response(envelope.message_id, envelope.session, result)
 end
 
+local function handle_level_action(envelope)
+    if not require_login(envelope) then
+        return
+    end
+    if not room_id then
+        send_business_error(
+            envelope.message_id,
+            envelope.session,
+            error_code.NOT_IN_ROOM,
+            "当前连接尚未加入房间"
+        )
+        return
+    end
+
+    local body = decode_request_body(envelope)
+    local result = skynet.call(
+        lobby_service,
+        "lua",
+        "SUBMIT_LEVEL_ACTION",
+        account,
+        skynet.self(),
+        body.roomId,
+        body.levelId,
+        body.action,
+        body.boolValue,
+        body.clientActionId
+    )
+    send_response(envelope.message_id, envelope.session, result)
+end
+
+local function handle_ready_next_level(envelope)
+    if not require_login(envelope) then
+        return
+    end
+    if not room_id then
+        send_business_error(
+            envelope.message_id,
+            envelope.session,
+            error_code.NOT_IN_ROOM,
+            "当前连接尚未加入房间"
+        )
+        return
+    end
+
+    local body = decode_request_body(envelope)
+    local result = skynet.call(
+        lobby_service,
+        "lua",
+        "READY_NEXT_LEVEL",
+        account,
+        skynet.self(),
+        body.roomId,
+        body.levelId
+    )
+    send_response(envelope.message_id, envelope.session, result)
+end
+
 local request_handlers = {
     [protocol.MESSAGE_ID.HEARTBEAT] = handle_heartbeat,
     [protocol.MESSAGE_ID.GUEST_LOGIN] = handle_guest_login,
     [protocol.MESSAGE_ID.CREATE_ROOM] = handle_create_room,
     [protocol.MESSAGE_ID.JOIN_ROOM] = handle_join_room,
+    [protocol.MESSAGE_ID.LEVEL_ACTION] = handle_level_action,
+    [protocol.MESSAGE_ID.READY_NEXT_LEVEL] = handle_ready_next_level,
 }
 
 local function handle_payload(payload)

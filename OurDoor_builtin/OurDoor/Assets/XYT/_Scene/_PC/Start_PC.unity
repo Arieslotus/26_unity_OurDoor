@@ -44603,6 +44603,7 @@ GameObject:
   - component: {fileID: 1344646750}
   - component: {fileID: 1344646749}
   - component: {fileID: 1344646748}
+  - component: {fileID: 1344646753}
   m_Layer: 0
   m_Name: OnelineRoot
   m_TagString: Untagged
@@ -44686,6 +44687,22 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1344646753
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1344646747}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 65eca864d229abe49b361789130d5d79, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  onlineController: {fileID: 1344646749}
+  duplicateAction: SET_POWER
+  duplicateBoolValue: 1
+  duplicateClientActionId: 
 --- !u!1 &1346973400
 GameObject:
   m_ObjectHideFlags: 0

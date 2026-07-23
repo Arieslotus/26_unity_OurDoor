@@ -72,6 +72,9 @@ namespace OurDoor.LXY.Networking.Protocol
         public int levelId;
         public int revision;
         public RoomPlayerDto[] players;
+        public Level1StateDto level1;
+        public Level2StateDto level2;
+        public Level3StateDto level3;
     }
 
     [Serializable]

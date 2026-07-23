@@ -9,6 +9,11 @@ logger = nil
 
 luaservice = server_root .. "service/?.lua;" .. skynet_root .. "service/?.lua"
 lualoader = skynet_root .. "lualib/loader.lua"
-lua_path = server_root .. "lualib/?.lua;" .. skynet_root .. "lualib/?.lua;" .. skynet_root .. "lualib/?/init.lua"
+lua_path = server_root .. "lualib/?.lua;"
+    .. server_root .. "games/?.lua;"
+    .. skynet_root .. "lualib/?.lua;"
+    .. skynet_root .. "lualib/?/init.lua"
+
+lxy_game_rule_module = "ourdoor.level_rules"
 lua_cpath = skynet_root .. "luaclib/?.so"
 cpath = skynet_root .. "cservice/?.so"

@@ -4,7 +4,8 @@
 
 - M0：离线/在线操作接缝，已验收。
 - M1：TCP、协议、session、心跳，已验收。
-- M2：临时账号、双人房间、角色和场景，等待运行验收。
+- M2：临时账号、双人房间、角色和场景，已验收。
+- M3：第一关服务端权威同步，代码完成，等待运行验收。
 
 ## M2 手动配置
 
@@ -52,6 +53,21 @@
 6. 两端收到相同房间快照和 `ROOM_READY` 后进入相同场景。
 
 创建者固定为 `Outer`，加入者固定为 `Inner`。
+
+## M3 手动配置
+
+在开始界面的常驻网络 GameObject 上增加 `M3Level1DebugPanel`，并将
+`Online Controller` 指向同一对象上的 `OurDoorOnlineController`。
+该面板随常驻对象进入 `Shop_PC`，用于：
+
+- 单独发送 `SET_POWER`、`PASSWORD_FOUND`、`LOCK_OPENED`。
+- 验证错误角色与错误顺序返回明确错误。
+- 连续发送两次相同 `clientActionId`，验证 revision 不增加。
+- 查看当前第一关完整快照。
+
+第一关正式交互仍使用 M0 已接好的原入口，不需要修改或重新绑定 XYT
+组件。客户端只提交意图；`Level1Manager` 只在收到更高 revision 的服务端
+快照后更新。
 
 ## 测试
 

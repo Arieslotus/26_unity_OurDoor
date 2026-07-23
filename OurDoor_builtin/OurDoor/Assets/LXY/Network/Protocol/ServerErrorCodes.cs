@@ -15,5 +15,13 @@ namespace OurDoor.LXY.Networking.Protocol
         public const int RoomNotFound = 2003;
         public const int RoomFull = 2004;
         public const int RoomNotWaiting = 2005;
+        public const int NotInRoom = 3001;
+        public const int RoomNotPlaying = 3002;
+        public const int LevelMismatch = 3003;
+        public const int RoleForbidden = 3004;
+        public const int PreconditionNotMet = 3005;
+        public const int InvalidAction = 3006;
+        public const int LevelNotComplete = 3007;
+        public const int NoNextLevel = 3008;
     }
 }

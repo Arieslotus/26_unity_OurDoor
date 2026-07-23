@@ -80,13 +80,15 @@ Assets/LXY/
 │   │   ├── MessageIds.cs
 │   │   ├── ProtocolCodec.cs
 │   │   ├── ProtocolDtos.cs
-│   │   └── LobbyDtos.cs
+│   │   ├── LobbyDtos.cs
+│   │   └── LevelActionDtos.cs
 │   ├── Session/
 │   │   ├── NetworkSession.cs
 │   │   └── OnlineSessionState.cs
 │   ├── Services/
 │   │   ├── AuthService.cs
-│   │   └── RoomService.cs
+│   │   ├── RoomService.cs
+│   │   └── LevelActionService.cs
 │   ├── NetworkManager.cs
 │   └── NetworkConfig.cs
 ├── Online/
@@ -97,9 +99,11 @@ Assets/LXY/
 │   │   ├── OurDoorOnlineController.cs
 │   │   ├── OurDoorSceneRouter.cs
 │   │   ├── OurDoorRoleAdapter.cs
-│   │   └── OurDoorOnlineLevelSelectAdapter.cs
+│   │   ├── OurDoorOnlineLevelSelectAdapter.cs
+│   │   └── OurDoorLevel1SnapshotSynchronizer.cs
 │   └── Debug/
-│       └── M2LobbyDebugPanel.cs
+│       ├── M2LobbyDebugPanel.cs
+│       └── M3Level1DebugPanel.cs
 └── Tests/
     └── EditMode/
 ```
@@ -109,7 +113,7 @@ Assets/LXY/
 - `Network/Core`：连接、收发、半包/粘包和主线程队列。
 - `Network/Protocol`：通用消息头、消息 ID、错误码和 DTO。
 - `Network/Session`：登录与房间会话状态。
-- `Network/Services`：临时登录和房间用例；M6 再增加匹配服务。
+- `Network/Services`：临时登录、房间和关卡操作用例；M6 再增加匹配服务。
 - `NetworkManager`：连接状态、session、请求超时、心跳和推送分发。
 - `Online/OurDoor`：唯一允许引用现有项目代码的适配层。
 - `Tests`：帧解析、协议、状态机和关卡规则测试。
@@ -309,6 +313,30 @@ byte[]     jsonBody      // UTF-8，无 BOM
 - 前置状态满足。
 - `clientActionId` 未重复处理。
 
+成功响应：
+
+```json
+{
+  "code":0,
+  "message":"OK",
+  "clientActionId":"uid-000018",
+  "revision":2,
+  "duplicate":false,
+  "changed":true
+}
+```
+
+关卡操作错误码：
+
+| code | 含义 |
+| ---: | --- |
+| 3001 | 当前账号不属于请求房间 |
+| 3002 | 房间不在 `playing` 阶段 |
+| 3003 | 请求关卡与房间关卡不一致 |
+| 3004 | 角色无权执行该 action |
+| 3005 | 前置状态不满足 |
+| 3006 | 未知或当前里程碑未实现的 action |
+
 ### 6.4 房间快照
 
 ```json
@@ -495,7 +523,7 @@ OurDoor 使用纯 C# 客户端和自定义固定消息头，不能直接套用 U
 
 ### M2：临时账号、房间与场景
 
-状态：代码已完成，等待 Unity、Lua 与双客户端运行验收。
+状态：已完成并通过 Lua、Unity EditMode 与双客户端运行验收。
 
 开发：
 
@@ -513,16 +541,30 @@ OurDoor 使用纯 C# 客户端和自定义固定消息头，不能直接套用 U
 
 ### M3：第一关权威同步
 
+状态：代码已完成，等待 Lua、Unity EditMode 与双客户端运行验收。
+
 开发：
 
 - 完成 `LEVEL_ACTION`、幂等、角色与前置状态校验。
 - 接入第一关 3 个 action。
+- 客户端串行发送操作；服务端确认后广播完整快照。
+- 第一关快照应用层拒绝重复 revision、非法回退和缺失状态。
+- 通用 `game_rule` 与 `games/ourdoor` 规则实现分离。
+
+手动配置：
+
+- `Server/Skynet/config` 设置
+  `lxy_game_rule_module = "ourdoor.level_rules"`。
+- `lua_path` 增加 `server_root .. "games/?.lua;"`。
+- 常驻网络对象增加 `M3Level1DebugPanel`，并绑定
+  `OurDoorOnlineController`。
 
 验证：
 
 - 合法流程可完成。
 - 错误角色、越序和重复请求不改变状态。
 - 两端 revision 和状态一致。
+- 初始 revision 为 1；三个首次有效变化后依次为 2、3、4。
 
 ### M4：第二、三关权威同步
 
@@ -585,11 +627,9 @@ OurDoor 使用纯 C# 客户端和自定义固定消息头，不能直接套用 U
 - [ ] 匹配支持按关卡配对、取消和断线清理。
 - [ ] 复制通用客户端层与通用服务端层后，只替换适配层即可接入其他项目。
 
-## 12. 实施前确认项
+## 12. 后续待确认项
 
-1. 第三关角色归属是否按本文执行。
-2. 创建房间选择单个关卡，还是从第一关连续推进三关。
-3. 对端退出后返回 `Start_PC`，还是停留当前场景显示结束面板。
-4. Skynet 服务端地址、端口、防火墙和 Linux 启动方式。
+1. M5 对端退出后返回 `Start_PC`，还是停留当前场景显示结束面板。
+2. 部署使用的 Skynet 地址、端口、防火墙和 Linux 启动方式。
 
-以上属于业务或部署配置，不在代码中擅自决定。
+以上配置不在代码中自动修改。
