@@ -1,0 +1,17 @@
+--- <summary>
+--- 实现功能：集中定义通用账号和房间业务错误码。
+--- </summary>
+local error_code = {
+    OK = 0,
+    INVALID_REQUEST = 1001,
+    ALREADY_LOGGED_IN = 1002,
+    GUEST_ALREADY_ONLINE = 1003,
+    NOT_LOGGED_IN = 1004,
+    ALREADY_IN_ROOM = 2001,
+    INVALID_LEVEL = 2002,
+    ROOM_NOT_FOUND = 2003,
+    ROOM_FULL = 2004,
+    ROOM_NOT_WAITING = 2005,
+}
+
+return error_code

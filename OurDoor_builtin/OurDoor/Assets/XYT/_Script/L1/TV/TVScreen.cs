@@ -152,7 +152,7 @@ public class TVScreen : MonoBehaviour
         // * 
         if(currentTextureIndex ==  textureArray.Length - 1)
         {
-            Level1Manager.Instance.SetPassWordFound(); // *
+            OurDoorLevelActionGateway.RequestLevel1PasswordFound();
         }
 
         SetCurrentTexture();

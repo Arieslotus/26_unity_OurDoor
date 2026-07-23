@@ -90,6 +90,39 @@ namespace OurDoor.LXY.Networking.Tests
             Assert.That(framer.BufferedByteCount, Is.Zero);
         }
 
+        [Test]
+        public void MaximumPayloadLengthIsAccepted()
+        {
+            var payload = new byte[MaxPayload];
+            var packet = PacketFramer.Frame(payload, ProtocolCodec.HeaderSize, MaxPayload);
+            var result = CreateFramer().Append(packet, 0, packet.Length);
+
+            Assert.That(result, Has.Count.EqualTo(1));
+            Assert.That(result[0].Length, Is.EqualTo(MaxPayload));
+        }
+
+        [Test]
+        public void PayloadAboveMaximumIsRejected()
+        {
+            var payload = new byte[MaxPayload + 1];
+
+            Assert.Throws<InvalidDataException>(() =>
+                PacketFramer.Frame(payload, ProtocolCodec.HeaderSize, MaxPayload));
+        }
+
+        [Test]
+        public void InvalidLengthClearsPreviouslyBufferedBytes()
+        {
+            var framer = CreateFramer();
+            var incomplete = new byte[] { 0x00 };
+            framer.Append(incomplete, 0, incomplete.Length);
+
+            var invalidRemainder = new byte[] { 0x00 };
+            Assert.Throws<InvalidDataException>(() =>
+                framer.Append(invalidRemainder, 0, invalidRemainder.Length));
+            Assert.That(framer.BufferedByteCount, Is.Zero);
+        }
+
         private static PacketFramer CreateFramer()
         {
             return new PacketFramer(MaxPayload, ProtocolCodec.HeaderSize);

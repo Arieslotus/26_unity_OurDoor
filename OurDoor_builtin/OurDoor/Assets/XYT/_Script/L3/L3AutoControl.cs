@@ -31,6 +31,9 @@ public class L3AutoControl : MonoBehaviour
 
     private void Start()
     {
+        if (OnlineActionBridge.IsOnline)
+            isAutoControl = false;
+
         // which auto
         if (PlayersManager.Instance.currentPlayerType == PlayerType.Outer)
         {

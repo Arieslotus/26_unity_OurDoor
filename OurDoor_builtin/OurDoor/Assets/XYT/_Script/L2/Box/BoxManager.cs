@@ -120,7 +120,7 @@ public class BoxManager : MonoBehaviour
         Debug.Log("全部搭建完成");
 
         SetClimbUI(true); // 显示攀爬ui
-        Level2Manager.Instance.SetBoxBuild(); // * talk
+        OurDoorLevelActionGateway.RequestLevel2BoxBuilt();
     }
 
     public void SetClimbUI(bool active)

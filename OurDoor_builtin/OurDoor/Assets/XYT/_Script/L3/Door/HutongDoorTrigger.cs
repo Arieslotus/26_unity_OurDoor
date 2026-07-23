@@ -44,7 +44,7 @@ public class HutongDoorTrigger : MonoBehaviour
         if (doorController != null)
             doorController.OpenDoor();
 
-        L3Manager.Instance.SetDoorOpened();
+        OurDoorLevelActionGateway.RequestLevel3DoorOpened();
     }
 
 

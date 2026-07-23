@@ -14,13 +14,15 @@ public class Level2Manager : MonoBehaviour
         // init
         KeyFound = false;
         KeyLandWall = false;
+        BoxBuild = false;
+        DoorOpen = false;
     }
 
     // ×´Ì¬
     public bool KeyFound { get; private set; } // not use
     public bool KeyLandWall { get; private set; }
-    bool BoxBuild = false;
-    bool DoorOpen = false;
+    public bool BoxBuild { get; private set; }
+    public bool DoorOpen { get; private set; }
 
     // ÊÂ¼þ
     public event Action OnKeyFound;

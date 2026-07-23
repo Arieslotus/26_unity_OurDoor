@@ -8,6 +8,7 @@ using UnityEngine;
 
 namespace OurDoor.LXY.Networking
 {
+    [DefaultExecutionOrder(-900)]
     public sealed class NetworkManager : MonoBehaviour
     {
         private sealed class PendingRequest
@@ -43,26 +44,34 @@ namespace OurDoor.LXY.Networking
         {
             if (Instance != null && Instance != this)
             {
-                Destroy(gameObject);
-                return;
+                throw new InvalidOperationException(
+                    $"[网络管理器] 检测到重复组件，对象：{gameObject.name}。");
             }
 
+            config.Validate();
+            MainThreadDispatcher.RequireInstance();
             Instance = this;
             DontDestroyOnLoad(gameObject);
-            MainThreadDispatcher.EnsureExists();
             CreateClient();
         }
 
         public async Task ConnectAsync(CancellationToken cancellationToken = default)
         {
             if (_client == null)
-                CreateClient();
+                throw new InvalidOperationException("[网络管理器] NetworkClient 尚未初始化。");
+            if (IsConnected)
+                throw new InvalidOperationException("[网络管理器] 当前已经连接，不能重复连接。");
+
+            config.Validate();
             await _client.ConnectAsync(config.Host, config.Port, config.ConnectTimeout, cancellationToken);
         }
 
         public void Disconnect()
         {
-            _client?.Close();
+            if (_client == null)
+                throw new InvalidOperationException("[网络管理器] NetworkClient 尚未初始化，无法断开。");
+
+            _client.Close();
             FailAllPending(new OperationCanceledException("Network connection closed."));
         }
 
@@ -107,8 +116,19 @@ namespace OurDoor.LXY.Networking
                 if (typeof(TResponse) == typeof(string))
                     return (TResponse)(object)response.JsonBody;
                 if (string.IsNullOrEmpty(response.JsonBody))
-                    return default;
-                return JsonUtility.FromJson<TResponse>(response.JsonBody);
+                {
+                    throw new InvalidOperationException(
+                        $"[网络响应] 消息 {messageId}/{session} 缺少 JSON 响应体。");
+                }
+
+                var result = JsonUtility.FromJson<TResponse>(response.JsonBody);
+                if (ReferenceEquals(result, null))
+                {
+                    throw new InvalidOperationException(
+                        $"[网络响应] 消息 {messageId}/{session} 无法解析为 {typeof(TResponse).Name}。" +
+                        $"JSON={response.JsonBody}");
+                }
+                return result;
             }
             finally
             {
@@ -152,7 +172,9 @@ namespace OurDoor.LXY.Networking
 
                 if (pending == null)
                 {
-                    Debug.LogWarning($"[LXY Network] Unknown or expired response session {envelope.Session}.");
+                    Debug.LogError(
+                        $"[网络响应] 收到未知或已超时的响应，" +
+                        $"messageId={envelope.MessageId}, session={envelope.Session}。");
                     return;
                 }
 
@@ -168,7 +190,16 @@ namespace OurDoor.LXY.Networking
             }
 
             if (envelope.MessageType == MessageType.Push)
+            {
                 PushReceived?.Invoke(envelope);
+                return;
+            }
+
+            Debug.LogError(
+                $"[网络协议] 服务端发送了不允许的消息类型，" +
+                $"messageId={envelope.MessageId}, session={envelope.Session}, " +
+                $"messageType={envelope.MessageType}。");
+            Disconnect();
         }
 
         private void OnDisconnected(Exception exception)

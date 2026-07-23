@@ -10,7 +10,7 @@ namespace OurDoor.LXY.Networking.Day1
         [SerializeField] private bool runOnStart = true;
         [SerializeField] private string host = "127.0.0.1";
         [SerializeField] private int port = 8888;
-        [SerializeField, Min(1)] private int heartbeatCount = 20;
+        [SerializeField, Min(1)] private int heartbeatCount = 100;
 
         private CancellationTokenSource _cancellation;
 
@@ -40,7 +40,11 @@ namespace OurDoor.LXY.Networking.Day1
             {
                 var manager = NetworkManager.Instance;
                 if (manager == null)
-                    manager = gameObject.AddComponent<NetworkManager>();
+                {
+                    throw new InvalidOperationException(
+                        "[M1 心跳测试] 场景中缺少 NetworkManager。" +
+                        "请在常驻网络对象上手动添加 MainThreadDispatcher、NetworkManager。");
+                }
 
                 manager.Config.SetEndpoint(host, port);
                 Status = $"Connecting to {host}:{port}";

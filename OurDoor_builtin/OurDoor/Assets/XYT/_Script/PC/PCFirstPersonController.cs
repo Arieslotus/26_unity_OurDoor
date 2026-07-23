@@ -67,6 +67,8 @@ public class PCFirstPersonController : MonoBehaviour
 
     private bool cursorLocked;
     private bool controlEnabled = true;
+    private bool isTemporarilyReleasingCursor;
+    private bool restoreCursorLockAfterTemporaryRelease;
 
     public bool IsCursorLocked => cursorLocked;
     public bool IsControlEnabled => controlEnabled;
@@ -343,7 +345,37 @@ public class PCFirstPersonController : MonoBehaviour
         if (keyboard != null &&
             keyboard.escapeKey.wasPressedThisFrame)
         {
+            isTemporarilyReleasingCursor = false;
+            restoreCursorLockAfterTemporaryRelease = false;
             SetCursorLocked(false);
+            return;
+        }
+
+        bool isLeftAltPressed =
+            keyboard != null &&
+            keyboard.leftAltKey.isPressed;
+
+        // 按住左 Alt 时临时释放鼠标，便于操作界面。
+        if (isLeftAltPressed)
+        {
+            if (!isTemporarilyReleasingCursor)
+            {
+                isTemporarilyReleasingCursor = true;
+                restoreCursorLockAfterTemporaryRelease = cursorLocked;
+                SetCursorLocked(false);
+            }
+
+            return;
+        }
+
+        // 松开左 Alt 后恢复按下前的锁定状态。
+        if (isTemporarilyReleasingCursor)
+        {
+            isTemporarilyReleasingCursor = false;
+            bool shouldRestoreCursorLock =
+                restoreCursorLockAfterTemporaryRelease;
+            restoreCursorLockAfterTemporaryRelease = false;
+            SetCursorLocked(shouldRestoreCursorLock);
             return;
         }
 
@@ -382,6 +414,8 @@ public class PCFirstPersonController : MonoBehaviour
 
         if (!enabled)
         {
+            isTemporarilyReleasingCursor = false;
+            restoreCursorLockAfterTemporaryRelease = false;
             SetCursorLocked(false);
         }
     }

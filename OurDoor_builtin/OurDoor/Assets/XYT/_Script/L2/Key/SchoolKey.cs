@@ -92,7 +92,7 @@ public class SchoolKey : MonoBehaviour
     IEnumerator Wait1()
     {
         yield return new WaitForSeconds(0.5f);
-        Level2Manager.Instance.SetKeyFound(); // **
+        OurDoorLevelActionGateway.RequestLevel2KeyFound();
     }
 
     // throw ----
@@ -181,7 +181,7 @@ public class SchoolKey : MonoBehaviour
     IEnumerator Wait0()
     {
         yield return new WaitForSeconds(2f);
-        Level2Manager.Instance.SetKeyLandOnWall(); // **
+        OurDoorLevelActionGateway.RequestLevel2KeyLanded();
 
         yield return new WaitForSeconds(10f);
 

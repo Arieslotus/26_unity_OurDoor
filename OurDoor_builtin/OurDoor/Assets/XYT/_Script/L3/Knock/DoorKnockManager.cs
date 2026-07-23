@@ -122,7 +122,7 @@ public class DoorKnockManager : MonoBehaviour
         Debug.Log("°µºÅ³É¹¦");
 
         StartCoroutine(HideTextAfterSuccess());
-        L3Manager.Instance.SetPasswordSuccess();
+        OurDoorLevelActionGateway.RequestLevel3PasswordSuccess();
     }
 
     IEnumerator HideTextAfterSuccess()

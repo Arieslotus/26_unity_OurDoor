@@ -50,7 +50,7 @@ public class ElectricBox : MonoBehaviour
             if (!flag)
             {
 
-                Level1Manager.Instance.SetPowerOn(true); // *
+                OurDoorLevelActionGateway.RequestLevel1Power(true);
 
                 //light
                 greenLight.gameObject.SetActive(true);
@@ -64,7 +64,7 @@ public class ElectricBox : MonoBehaviour
         {
             if (flag)
             {
-                Level1Manager.Instance.SetPowerOn(false); // *
+                OurDoorLevelActionGateway.RequestLevel1Power(false);
 
 
                 //light

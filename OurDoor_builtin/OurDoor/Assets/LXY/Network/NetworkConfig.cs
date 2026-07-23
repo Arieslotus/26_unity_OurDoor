@@ -14,9 +14,31 @@ namespace OurDoor.LXY.Networking
 
         public string Host => host;
         public int Port => port;
-        public TimeSpan ConnectTimeout => TimeSpan.FromSeconds(Mathf.Max(0.1f, connectTimeoutSeconds));
-        public TimeSpan RequestTimeout => TimeSpan.FromSeconds(Mathf.Max(0.1f, requestTimeoutSeconds));
-        public int MaximumPayloadLength => Mathf.Clamp(maximumPayloadLength, Protocol.ProtocolCodec.HeaderSize, ushort.MaxValue);
+        public TimeSpan ConnectTimeout => TimeSpan.FromSeconds(connectTimeoutSeconds);
+        public TimeSpan RequestTimeout => TimeSpan.FromSeconds(requestTimeoutSeconds);
+        public int MaximumPayloadLength => maximumPayloadLength;
+
+        public void Validate()
+        {
+            if (string.IsNullOrWhiteSpace(host))
+                throw new InvalidOperationException("[网络配置] Host 不能为空。");
+            if (port <= 0 || port > ushort.MaxValue)
+                throw new InvalidOperationException($"[网络配置] Port 超出范围：{port}。");
+            if (connectTimeoutSeconds <= 0f)
+                throw new InvalidOperationException(
+                    $"[网络配置] Connect Timeout Seconds 必须大于 0，当前值：{connectTimeoutSeconds}。");
+            if (requestTimeoutSeconds <= 0f)
+                throw new InvalidOperationException(
+                    $"[网络配置] Request Timeout Seconds 必须大于 0，当前值：{requestTimeoutSeconds}。");
+            if (maximumPayloadLength < Protocol.ProtocolCodec.HeaderSize ||
+                maximumPayloadLength > ushort.MaxValue)
+            {
+                throw new InvalidOperationException(
+                    $"[网络配置] Maximum Payload Length 必须在 " +
+                    $"[{Protocol.ProtocolCodec.HeaderSize}, {ushort.MaxValue}] 内，" +
+                    $"当前值：{maximumPayloadLength}。");
+            }
+        }
 
         public void SetEndpoint(string newHost, int newPort)
         {

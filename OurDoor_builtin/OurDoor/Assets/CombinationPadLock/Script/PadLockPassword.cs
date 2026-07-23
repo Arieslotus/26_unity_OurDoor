@@ -1,4 +1,4 @@
-﻿// Script by Marcelli Michele
+// Script by Marcelli Michele
 
 using System.Linq;
 using TMPro;
@@ -34,7 +34,7 @@ public class PadLockPassword : MonoBehaviour
                 Debug.Log("Password correct");
 
                 //
-                Level1Manager.Instance.SetLockOpened(); // *
+                OurDoorLevelActionGateway.RequestLevel1LockOpened();
 
                 // Es. Below the for loop to disable Blinking Material after the correct password
                 for (int i = 0; i < _moveRull._rullers.Count; i++)

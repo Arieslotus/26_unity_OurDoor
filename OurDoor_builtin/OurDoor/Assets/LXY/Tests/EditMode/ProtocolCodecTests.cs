@@ -72,5 +72,40 @@ namespace OurDoor.LXY.Networking.Tests
             Assert.Throws<InvalidDataException>(() => ProtocolCodec.Encode(
                 new NetworkEnvelope(1, 1, MessageType.Push, "{}")));
         }
+
+        [Test]
+        public void ResponseWithZeroSessionIsRejected()
+        {
+            Assert.Throws<InvalidDataException>(() => ProtocolCodec.Encode(
+                new NetworkEnvelope(1, 0, MessageType.Response, "{}")));
+        }
+
+        [Test]
+        public void UnknownMessageTypeIsRejected()
+        {
+            Assert.Throws<InvalidDataException>(() => ProtocolCodec.Encode(
+                new NetworkEnvelope(1, 1, (MessageType)99, "{}")));
+        }
+
+        [Test]
+        public void MessageIdZeroIsRejected()
+        {
+            Assert.Throws<InvalidDataException>(() => ProtocolCodec.Encode(
+                new NetworkEnvelope(0, 1, MessageType.Request, "{}")));
+        }
+
+        [Test]
+        public void InvalidUtf8BodyIsRejected()
+        {
+            var payload = new byte[]
+            {
+                0x00, 0x01,
+                0x00, 0x00, 0x00, 0x01,
+                (byte)MessageType.Request,
+                0xC3, 0x28
+            };
+
+            Assert.Throws<InvalidDataException>(() => ProtocolCodec.Decode(payload));
+        }
     }
 }

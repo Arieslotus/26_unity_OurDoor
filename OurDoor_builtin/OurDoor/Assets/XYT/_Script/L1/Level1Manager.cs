@@ -11,11 +11,13 @@ public class Level1Manager : MonoBehaviour
 
         // init
         PowerOn = false;
+        PasswordFound = false;
         LockOpened = false;
     }
 
     // 状态
     public bool PowerOn { get; private set; }
+    public bool PasswordFound { get; private set; }
     public bool LockOpened { get; private set; }
 
     // 事件
@@ -61,6 +63,7 @@ public class Level1Manager : MonoBehaviour
 
     public void SetPassWordFound()
     {
+        PasswordFound = true;
         Debug.Log("密码已找到");
         OnPassWordFound?.Invoke();
     }

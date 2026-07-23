@@ -27,6 +27,9 @@ public class Level1AutoControl : MonoBehaviour
         {
             isAutoControl = GameManager.Instance.IsLevelAutoControl();
         }
+
+        if (OnlineActionBridge.IsOnline)
+            isAutoControl = false;
     }
     private void Start()
     {

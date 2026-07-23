@@ -1,42 +1,59 @@
-# LXY 网络模块：Day 1
+# LXY 联网模块
 
-## 已实现
+## 当前里程碑
 
-- C# TCP 异步连接、后台读取和串行发送。
-- 两字节大端长度头及半包/粘包处理。
-- `messageId + session + messageType + JSON` 编解码。
-- Unity 主线程消息队列。
-- session 请求/响应匹配和请求超时。
-- Skynet HEARTBEAT 服务。
-- C#、Lua 拆包测试和跨语言固定字节向量。
+- M0：离线/在线操作接缝，已验收。
+- M1：TCP、协议、session、心跳，已验收。
+- M2：临时账号、双人房间、角色和场景，等待运行验收。
 
-## 启动服务端
+## M2 手动配置
 
-先准备并编译 Skynet，然后在 Unity 项目根目录执行：
+在开始界面的常驻网络 GameObject 上依次添加：
 
-```sh
-SKYNET_ROOT=/Skynet的绝对路径 ./Assets/LXY/Server/run.sh
-```
+1. `MainThreadDispatcher`
+2. `NetworkManager`
+3. `OurDoorOnlineController`
+4. `M2LobbyDebugPanel`
 
-默认监听 `0.0.0.0:8888`。
+`M2LobbyDebugPanel` 的 `Online Controller` 必须指向同一对象上的
+`OurDoorOnlineController`。调试面板用于 M2 验收，不是正式 UI。
 
-## Unity 验收
+复用现有选关按钮时，每个按钮：
 
-1. 在任意测试场景创建空 GameObject。
-2. 添加 `Day1HeartbeatRunner` 组件。
-3. 保持 Host 为 `127.0.0.1`、Port 为 `8888`、Heartbeat Count 为 `20`。
-4. 进入 Play Mode。
-5. Console 出现 `PASS: 20/20 heartbeats succeeded` 即通过。
+1. 添加 `OurDoorOnlineLevelSelectAdapter`。
+2. `Original Level Button` 指向该按钮原有的 `LevelSelectButton`。
+3. `Online Controller` 指向常驻网络对象。
+4. 将 Button 的 OnClick 从 `LevelSelectButton.OnClick` 改绑为
+   `OurDoorOnlineLevelSelectAdapter.OnClick`。
 
-该组件会在运行时自动创建 `NetworkManager` 和 `MainThreadDispatcher`，无需修改现有场景或脚本。
+`SimulateTwoPlayer` 仍执行原离线选关逻辑；`TwoPlayer` 只选择房间
+`levelId`，收到服务端 `ROOM_READY` 后才加载场景。
 
-## Unity 离线测试
+场景名固定映射：
 
-在 Test Runner 的 EditMode 中运行 `LXY.Networking.EditModeTests`，覆盖：
+| levelId | PC 场景 |
+| ---: | --- |
+| 1 | `Shop_PC` |
+| 2 | `School_PC` |
+| 3 | `Hutong_PC` |
 
-- 单包。
-- 包头和消息体分段到达。
-- 多包粘连。
-- 完整包加下一个半包。
-- 非法长度。
-- 大端消息头、协议往返和跨语言固定字节向量。
+以上三个场景必须由用户手动加入 Build Settings。缺少组件、引用、场景或
+非法状态时会明确报错，不会自动创建或改正。
+
+## M2 双客户端流程
+
+两个客户端分别执行：
+
+1. 连接同一 Host、Port。
+2. 登录前可点击“未登录创建房间”探针，确认服务端返回 `1004`。
+3. 使用不同自动生成的 guestId 临时登录。
+4. 创建端选择关卡并创建房间，房间码自动复制到剪贴板。
+5. 加入端输入房间码并加入。
+6. 两端收到相同房间快照和 `ROOM_READY` 后进入相同场景。
+
+创建者固定为 `Outer`，加入者固定为 `Inner`。
+
+## 测试
+
+Unity Test Runner 的 EditMode 中运行 `LXY.Networking.EditModeTests`。
+服务端 Lua 测试见 `Server/Skynet/README.md`。

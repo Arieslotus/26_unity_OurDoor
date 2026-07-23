@@ -40,7 +40,7 @@ public class InsideMetalPiece : MonoBehaviour
 
             Debug.Log("цедздц╣╫лЗф╛");
 
-            L3Manager.Instance.SetMetalPieceReceived();
+            OurDoorLevelActionGateway.RequestLevel3MetalReceived();
         }
     }
 

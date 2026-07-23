@@ -51,7 +51,7 @@ public class MetalPiece : MonoBehaviour
 
             Debug.Log("Ê°È¡µ½ÌúÆ¬");
 
-            L3Manager.Instance.SetMetalPieceFound();
+            OurDoorLevelActionGateway.RequestLevel3MetalFound();
         }
 
     }

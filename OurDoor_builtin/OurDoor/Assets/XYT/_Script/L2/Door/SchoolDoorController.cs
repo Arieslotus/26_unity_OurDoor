@@ -57,7 +57,7 @@ public class SchoolDoorController : MonoBehaviour
 
         yield return new WaitForSeconds(3.5f); // time
 
-        Level2Manager.Instance.SetDoorOpen(); // * talk
+        OurDoorLevelActionGateway.RequestLevel2DoorOpened();
         particles.gameObject.SetActive(true);
 
         float timer = 0;

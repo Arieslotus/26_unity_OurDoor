@@ -149,6 +149,6 @@ public class WireExtractTrigger : MonoBehaviour
             wirePick.enabled = true;
         }
 
-        L3Manager.Instance.SetWireFound();
+        OurDoorLevelActionGateway.RequestLevel3WireFound();
     }
 }
