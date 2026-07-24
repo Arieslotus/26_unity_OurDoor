@@ -11,22 +11,8 @@ public static class OurDoorLevel2Presentation
         SchoolKey key = UnityEngine.Object.FindObjectOfType<SchoolKey>();
         if (key == null)
             throw new InvalidOperationException("[M4 第二关表现] 场景中缺少 SchoolKey。");
-        if (key.targetPoint == null)
-            throw new InvalidOperationException("[M4 第二关表现] SchoolKey 缺少 targetPoint。");
 
-        Rigidbody body = key.GetComponent<Rigidbody>();
-        if (body == null)
-            throw new InvalidOperationException("[M4 第二关表现] SchoolKey 缺少 Rigidbody。");
-
-        key.transform.SetPositionAndRotation(
-            key.targetPoint.position,
-            key.targetPoint.rotation);
-        body.isKinematic = true;
-        body.useGravity = false;
-        if (key.trail != null)
-            key.trail.gameObject.SetActive(false);
-        if (key.particles != null)
-            key.particles.gameObject.SetActive(true);
+        key.ApplyRemoteLandedState();
     }
 
     public static void ApplyBoxBuiltForInner()

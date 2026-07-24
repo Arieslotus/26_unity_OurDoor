@@ -1,3 +1,7 @@
+/// <summary>
+/// 实现功能：处理第二关钥匙的拾取、抛投、落地及联网远端落地状态。
+/// </summary>
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -5,17 +9,17 @@ using UnityEngine.XR.Interaction.Toolkit;
 
 public class SchoolKey : MonoBehaviour
 {
-    [Header("ʰȡ")]
+    [Header("拾取")]
     private XRGrabInteractable grab;
     private PCPickupInteractable pick;
     Rigidbody rb;
 
-    private bool picked = false; // �Ѿ���������ʰȡ
+    private bool picked = false; // 已经从邮箱中拾取
 
-    [Header("�׳�")]
-    public Transform targetPoint; // ���
-    public Transform trail; // β��
-    public Transform particles; // ����
+    [Header("抛出")]
+    public Transform targetPoint; // 落点
+    public Transform trail; // 尾线
+    public Transform particles; // 粒子
 
     Vector3 lastPos;
     Vector3 velocity;
@@ -23,10 +27,10 @@ public class SchoolKey : MonoBehaviour
     public float flyDuration = 1.2f;
     public float arcHeight = 2f;
 
-    bool hasThrown = false; // �Ѿ��׳�
+    bool hasThrown = false; // 已经抛出
 
-    [Header("��ǽ��")]
-    bool hasPickedFromWall = false; // �Ѿ���ǽ������
+    [Header("爬墙拿")]
+    bool hasPickedFromWall = false; // 已经从墙上拿下
     ClimbController climb;
 
     void Awake()
@@ -77,7 +81,7 @@ public class SchoolKey : MonoBehaviour
                 if (climb != null)
                 {
                     hasPickedFromWall = true;
-                    climb.OnGetKey(); // * �õ�Կ��ſ������
+                    climb.OnGetKey(); // * 拿到钥匙趴下爬下
                     if (particles != null) particles.gameObject.SetActive(false);
                 }
                 else
@@ -97,10 +101,59 @@ public class SchoolKey : MonoBehaviour
 
     // throw ----
 
-    [ContextMenu("�Զ��׳�")]
+    [ContextMenu("自动抛出")]
     public void AutoThrowKey()
     {
         StartThrowSequence();
+    }
+
+    /// <summary>
+    /// 将远端客户端中的钥匙直接应用为“已从邮箱取出并落在墙上、可被 Outer 拾取”的状态。
+    /// 这是联网表现层的显式入口，不参与原有本地拾取和抛出流程。
+    /// </summary>
+    public void ApplyRemoteLandedState()
+    {
+        if (targetPoint == null)
+            throw new InvalidOperationException($"[第二关钥匙] {name} 缺少 targetPoint，无法应用远端落地状态。");
+        if (rb == null)
+            throw new InvalidOperationException($"[第二关钥匙] {name} 缺少 Rigidbody，无法应用远端落地状态。");
+        if (pick == null)
+            throw new InvalidOperationException($"[第二关钥匙] {name} 缺少 PCPickupInteractable，Outer 无法拾取钥匙。");
+        if (picked || hasThrown || hasPickedFromWall)
+        {
+            throw new InvalidOperationException(
+                $"[第二关钥匙] {name} 当前状态不允许重复应用远端落地状态：" +
+                $"picked={picked}, hasThrown={hasThrown}, hasPickedFromWall={hasPickedFromWall}。");
+        }
+
+        rb.isKinematic = true;
+        transform.SetPositionAndRotation(targetPoint.position, targetPoint.rotation);
+        rb.velocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
+
+        picked = true;
+        hasThrown = true;
+        hasPickedFromWall = false;
+
+        if (trail != null)
+            trail.gameObject.SetActive(false);
+        if (particles != null)
+            particles.gameObject.SetActive(true);
+
+        rb.useGravity = true;
+        rb.isKinematic = false;
+        rb.WakeUp();
+
+        if (!pick.CanInteract(null))
+        {
+            throw new InvalidOperationException(
+                $"[第二关钥匙] {name} 已应用远端落地状态，但仍不可交互：" +
+                $"active={pick.isActiveAndEnabled}, isKinematic={rb.isKinematic}, isHeld={pick.IsHeld}。");
+        }
+
+        Debug.Log(
+            $"[第二关钥匙] {name} 已应用远端落地状态，" +
+            $"position={transform.position}, isKinematic={rb.isKinematic}, useGravity={rb.useGravity}。");
     }
 
     void Update()
@@ -117,7 +170,7 @@ public class SchoolKey : MonoBehaviour
     }
     void OnRelease()
     {
-        if (velocity.y > 0.6f) /*edit*/ // ԽС��vr��Խ�����׳�
+        if (velocity.y > 0.6f) /*edit*/ // 越小在vr中越容易抛出
         {
             StartThrowSequence();
         }
@@ -125,7 +178,7 @@ public class SchoolKey : MonoBehaviour
 
     void StartThrowSequence()
     {
-        if (hasThrown) return; // ����һ����Ч
+        if (hasThrown) return; // 仅第一此有效
 
         hasThrown = true;
 
