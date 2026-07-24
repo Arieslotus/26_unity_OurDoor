@@ -37,6 +37,7 @@ public sealed class OurDoorOnlineController : MonoBehaviour
 
     public NetworkSession Session { get; private set; }
     public int SelectedLevelId { get; private set; }
+    public string SelectedRolePreference { get; private set; } = RolePreferences.Any;
     public event Action<MatchFoundDto> MatchFound;
     public event Action<PlayerLeftDto> PlayerLeft;
 
@@ -138,6 +139,13 @@ public sealed class OurDoorOnlineController : MonoBehaviour
             $"scene={OurDoorSceneRouter.GetSceneName(levelId)}。");
     }
 
+    public void SelectRolePreference(string rolePreference)
+    {
+        RolePreferences.Validate(rolePreference, nameof(rolePreference));
+        SelectedRolePreference = rolePreference;
+        Debug.Log($"[M7 在线控制器] 已选择身份偏好：{rolePreference}。");
+    }
+
     public async Task<string> CreateSelectedRoomAsync()
     {
         if (SelectedLevelId == 0)
@@ -147,7 +155,10 @@ public sealed class OurDoorOnlineController : MonoBehaviour
         }
 
         string roomId =
-            await roomService.CreateRoomAsync(SelectedLevelId, cancellation.Token);
+            await roomService.CreateRoomAsync(
+                SelectedLevelId,
+                SelectedRolePreference,
+                cancellation.Token);
         Debug.Log(
             $"[M2 在线控制器] 房间创建成功，roomId={roomId}, " +
             $"levelId={Session.LevelId}, role={Session.Role}, revision={Session.Revision}。");
@@ -173,6 +184,7 @@ public sealed class OurDoorOnlineController : MonoBehaviour
         MatchRequestResponse response =
             await matchService.RequestMatchAsync(
                 SelectedLevelId,
+                SelectedRolePreference,
                 cancellation.Token);
         Debug.Log(
             $"[M6 在线控制器] 匹配请求完成，levelId={SelectedLevelId}, " +
@@ -180,9 +192,48 @@ public sealed class OurDoorOnlineController : MonoBehaviour
         return response;
     }
 
+    public async Task<MatchRequestResponse> RequestAnyLevelMatchAsync()
+    {
+        MatchRequestResponse response =
+            await matchService.RequestMatchAsync(
+                0,
+                SelectedRolePreference,
+                cancellation.Token);
+        Debug.Log(
+            $"[M7 在线控制器] 任意关卡匹配请求完成，" +
+            $"rolePreference={SelectedRolePreference}, queued={response.queued}, " +
+            $"state={Session.State}。");
+        return response;
+    }
+
     public Task<MatchCancelResponse> CancelMatchAsync()
     {
         return matchService.CancelMatchAsync(cancellation.Token);
+    }
+
+    public void DisconnectFromServer()
+    {
+        if (Session.State != OnlineSessionState.Connected &&
+            Session.State != OnlineSessionState.Lobby)
+        {
+            throw new InvalidOperationException(
+                $"[M7 在线控制器] 直接断开仅允许 Connected 或 Lobby，" +
+                $"当前={Session.State}。房间内必须执行主动退出，匹配中必须先取消匹配。");
+        }
+        if (!network.IsConnected)
+        {
+            throw new InvalidOperationException(
+                $"[M7 在线控制器] 会话状态为 {Session.State}，但 TCP 已断开。");
+        }
+
+        Debug.Log(
+            $"[M7 在线控制器] 玩家请求断开服务端，" +
+            $"uid={Session.Uid ?? "未登录"}, state={Session.State}。");
+        HandleConnectionTerminatedOnce(
+            "玩家主动断开服务端",
+            null,
+            false);
+        network.Disconnect();
     }
 
     public Task<LevelActionResponse> SubmitLevelActionAsync(

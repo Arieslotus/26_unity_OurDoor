@@ -26,6 +26,7 @@ namespace OurDoor.LXY.Networking.Protocol
     public sealed class CreateRoomRequest
     {
         public int levelId;
+        public string rolePreference;
     }
 
     [Serializable]

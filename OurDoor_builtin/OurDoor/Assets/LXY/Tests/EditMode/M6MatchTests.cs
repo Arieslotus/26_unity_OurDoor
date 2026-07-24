@@ -24,7 +24,7 @@ namespace OurDoor.LXY.Networking.Tests
         public void MatchFoundUsesRequestedLevelAndReachesWaitingRoom()
         {
             NetworkSession session = CreateLobbySession();
-            session.BeginMatching(2);
+            session.BeginMatching(2, RolePreferences.Any);
             session.EnterMatchedRoom("R00006", 2, "Outer", 1);
 
             Assert.That(session.State, Is.EqualTo(OnlineSessionState.WaitingRoom));
@@ -39,7 +39,7 @@ namespace OurDoor.LXY.Networking.Tests
         public void CancelMatchingReturnsToLobbyWithoutRoomState()
         {
             NetworkSession session = CreateLobbySession();
-            session.BeginMatching(3);
+            session.BeginMatching(3, RolePreferences.Any);
             session.CancelMatching();
 
             Assert.That(session.State, Is.EqualTo(OnlineSessionState.Lobby));
@@ -53,7 +53,7 @@ namespace OurDoor.LXY.Networking.Tests
         public void MatchFoundForAnotherLevelIsRejected()
         {
             NetworkSession session = CreateLobbySession();
-            session.BeginMatching(1);
+            session.BeginMatching(1, RolePreferences.Any);
 
             Assert.Throws<InvalidOperationException>(() =>
                 session.EnterMatchedRoom("R00006", 2, "Inner", 1));
@@ -65,10 +65,10 @@ namespace OurDoor.LXY.Networking.Tests
         public void DuplicateMatchRequestStateIsRejected()
         {
             NetworkSession session = CreateLobbySession();
-            session.BeginMatching(1);
+            session.BeginMatching(1, RolePreferences.Any);
 
             Assert.Throws<InvalidOperationException>(() =>
-                session.BeginMatching(1));
+                session.BeginMatching(1, RolePreferences.Any));
         }
 
         private static NetworkSession CreateLobbySession()

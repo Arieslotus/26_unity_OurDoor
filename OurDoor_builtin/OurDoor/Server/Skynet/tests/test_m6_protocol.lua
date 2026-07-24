@@ -16,5 +16,9 @@ assert(protocol.MESSAGE_ID.MATCH_CANCEL == 211, "MATCH_CANCEL 协议号必须为
 assert(protocol.MESSAGE_ID.MATCH_FOUND == 903, "MATCH_FOUND 协议号必须为 903")
 assert(error_code.ALREADY_MATCHING == 4001, "ALREADY_MATCHING 错误码必须为 4001")
 assert(error_code.NOT_MATCHING == 4002, "NOT_MATCHING 错误码必须为 4002")
+assert(
+    error_code.INVALID_ROLE_PREFERENCE == 4003,
+    "INVALID_ROLE_PREFERENCE 错误码必须为 4003"
+)
 
 print("LXY M6 match protocol tests passed")

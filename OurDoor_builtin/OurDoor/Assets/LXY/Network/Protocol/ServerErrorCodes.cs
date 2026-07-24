@@ -25,5 +25,6 @@ namespace OurDoor.LXY.Networking.Protocol
         public const int NoNextLevel = 3008;
         public const int AlreadyMatching = 4001;
         public const int NotMatching = 4002;
+        public const int InvalidRolePreference = 4003;
     }
 }

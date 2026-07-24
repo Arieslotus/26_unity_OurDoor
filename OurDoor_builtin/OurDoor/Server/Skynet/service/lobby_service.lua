@@ -7,14 +7,15 @@ local room_service
 local match_service
 local command = {}
 
-function command.CREATE_ROOM(account, agent, level_id)
+function command.CREATE_ROOM(account, agent, level_id, role_preference)
     return skynet.call(
         room_service,
         "lua",
         "CREATE_ROOM",
         account,
         agent,
-        level_id
+        level_id,
+        role_preference
     )
 end
 
@@ -29,14 +30,20 @@ function command.JOIN_ROOM(account, agent, room_id)
     )
 end
 
-function command.MATCH_REQUEST(account, agent, level_id)
+function command.MATCH_REQUEST(
+    account,
+    agent,
+    level_id,
+    role_preference
+)
     return skynet.call(
         match_service,
         "lua",
         "REQUEST",
         account,
         agent,
-        level_id
+        level_id,
+        role_preference
     )
 end
 

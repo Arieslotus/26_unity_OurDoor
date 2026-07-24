@@ -9,6 +9,7 @@ namespace OurDoor.LXY.Networking.Protocol
     public sealed class MatchRequest
     {
         public int levelId;
+        public string rolePreference;
     }
 
     [Serializable]
@@ -18,6 +19,7 @@ namespace OurDoor.LXY.Networking.Protocol
         public string message;
         public bool queued;
         public int levelId;
+        public string rolePreference;
     }
 
     [Serializable]
@@ -32,6 +34,7 @@ namespace OurDoor.LXY.Networking.Protocol
         public string message;
         public bool removed;
         public int levelId;
+        public string rolePreference;
     }
 
     [Serializable]

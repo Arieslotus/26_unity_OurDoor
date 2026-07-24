@@ -15,6 +15,7 @@ namespace OurDoor.LXY.Networking.Session
         public string Uid { get; private set; }
         public string DisplayName { get; private set; }
         public int MatchingLevelId { get; private set; }
+        public string MatchingRolePreference { get; private set; }
         public string RoomId { get; private set; }
         public int LevelId { get; private set; }
         public string Role { get; private set; }
@@ -72,17 +73,20 @@ namespace OurDoor.LXY.Networking.Session
             RaiseChanged();
         }
 
-        public void BeginMatching(int levelId)
+        public void BeginMatching(int levelId, string rolePreference)
         {
             RequireState(OnlineSessionState.Lobby, "开始匹配");
-            ValidateLevelId(levelId);
-            if (MatchingLevelId != 0)
+            ValidateMatchLevelId(levelId);
+            RolePreferences.Validate(rolePreference, nameof(rolePreference));
+            if (MatchingRolePreference != null)
             {
                 throw new InvalidOperationException(
-                    $"[网络会话] 开始匹配前存在旧的匹配关卡，levelId={MatchingLevelId}。");
+                    $"[网络会话] 开始匹配前存在旧身份偏好，" +
+                    $"preference={MatchingRolePreference}。");
             }
 
             MatchingLevelId = levelId;
+            MatchingRolePreference = rolePreference;
             State = OnlineSessionState.Matching;
             RaiseChanged();
         }
@@ -95,14 +99,23 @@ namespace OurDoor.LXY.Networking.Session
         {
             RequireState(OnlineSessionState.Matching, "处理 MATCH_FOUND");
             ValidateRoomIdentity(roomId, levelId, role, revision);
-            if (MatchingLevelId != levelId)
+            if (MatchingLevelId != 0 && MatchingLevelId != levelId)
             {
                 throw new InvalidOperationException(
                     $"[网络会话] MATCH_FOUND 关卡与匹配请求不一致，" +
                     $"请求={MatchingLevelId}, 服务端={levelId}。");
             }
+            if (!RolePreferences.AcceptsRole(
+                    MatchingRolePreference,
+                    role))
+            {
+                throw new InvalidOperationException(
+                    $"[网络会话] MATCH_FOUND 身份不符合匹配偏好，" +
+                    $"preference={MatchingRolePreference}, role={role}。");
+            }
 
             MatchingLevelId = 0;
+            MatchingRolePreference = null;
             RoomId = roomId;
             LevelId = levelId;
             Role = role;
@@ -115,10 +128,11 @@ namespace OurDoor.LXY.Networking.Session
         public void CancelMatching()
         {
             RequireState(OnlineSessionState.Matching, "结束匹配");
-            if (MatchingLevelId == 0)
-                throw new InvalidOperationException("[网络会话] Matching 状态缺少匹配关卡。");
+            if (MatchingRolePreference == null)
+                throw new InvalidOperationException("[网络会话] Matching 状态缺少身份偏好。");
 
             MatchingLevelId = 0;
+            MatchingRolePreference = null;
             State = OnlineSessionState.Lobby;
             RaiseChanged();
         }
@@ -292,6 +306,7 @@ namespace OurDoor.LXY.Networking.Session
         private void ClearRoomState()
         {
             MatchingLevelId = 0;
+            MatchingRolePreference = null;
             RoomId = null;
             LevelId = 0;
             Role = null;
@@ -346,6 +361,16 @@ namespace OurDoor.LXY.Networking.Session
                 throw new ArgumentOutOfRangeException(
                     nameof(levelId),
                     $"[网络会话] levelId 必须是 1、2、3，当前值={levelId}。");
+            }
+        }
+
+        private static void ValidateMatchLevelId(int levelId)
+        {
+            if (levelId < 0 || levelId > 3)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(levelId),
+                    $"[网络会话] 匹配 levelId 必须是 0、1、2、3，当前值={levelId}。");
             }
         }
 

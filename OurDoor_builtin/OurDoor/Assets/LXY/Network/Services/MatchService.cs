@@ -28,17 +28,19 @@ namespace OurDoor.LXY.Networking.Services
 
         public async Task<MatchRequestResponse> RequestMatchAsync(
             int levelId,
+            string rolePreference,
             CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
             ValidateLevelId(levelId);
+            RolePreferences.Validate(rolePreference, nameof(rolePreference));
             if (session.State != OnlineSessionState.Lobby)
             {
                 throw new InvalidOperationException(
                     $"[匹配服务] 请求匹配要求状态 Lobby，当前={session.State}。");
             }
             BeginOperation("请求匹配");
-            session.BeginMatching(levelId);
+            session.BeginMatching(levelId, rolePreference);
             try
             {
                 MatchRequestResponse response =
@@ -46,7 +48,11 @@ namespace OurDoor.LXY.Networking.Services
                         MatchRequest,
                         MatchRequestResponse>(
                         MessageIds.MatchRequest,
-                        new MatchRequest { levelId = levelId },
+                        new MatchRequest
+                        {
+                            levelId = levelId,
+                            rolePreference = rolePreference
+                        },
                         cancellationToken);
 
                 if (response.code != ServerErrorCodes.Success)
@@ -62,6 +68,15 @@ namespace OurDoor.LXY.Networking.Services
                         MessageIds.MatchRequest,
                         response.code,
                         response.message);
+                }
+                if (!string.Equals(
+                        response.rolePreference,
+                        rolePreference,
+                        StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"[匹配服务] MATCH_REQUEST 响应身份偏好不一致，" +
+                        $"请求={rolePreference}, 响应={response.rolePreference ?? "null"}。");
                 }
                 if (response.levelId != levelId)
                 {
@@ -92,6 +107,7 @@ namespace OurDoor.LXY.Networking.Services
             }
             BeginOperation("取消匹配");
             int requestedLevelId = session.MatchingLevelId;
+            string requestedRolePreference = session.MatchingRolePreference;
             try
             {
                 MatchCancelResponse response =
@@ -108,6 +124,16 @@ namespace OurDoor.LXY.Networking.Services
                         MessageIds.MatchCancel,
                         response.code,
                         response.message);
+                }
+                if (!string.Equals(
+                        response.rolePreference,
+                        requestedRolePreference,
+                        StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"[匹配服务] MATCH_CANCEL 响应身份偏好不一致，" +
+                        $"请求={requestedRolePreference}, " +
+                        $"响应={response.rolePreference ?? "null"}。");
                 }
                 if (!response.removed)
                     throw new InvalidOperationException("[匹配服务] 取消成功但服务端未移除队列项。");
@@ -181,11 +207,11 @@ namespace OurDoor.LXY.Networking.Services
 
         private static void ValidateLevelId(int levelId)
         {
-            if (levelId < 1 || levelId > 3)
+            if (levelId < 0 || levelId > 3)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(levelId),
-                    $"[匹配服务] levelId 必须是 1、2、3，当前={levelId}。");
+                    $"[匹配服务] levelId 必须是 0、1、2、3，当前={levelId}。");
             }
         }
 

@@ -22,6 +22,7 @@ local error_code = {
     NO_NEXT_LEVEL = 3008,
     ALREADY_MATCHING = 4001,
     NOT_MATCHING = 4002,
+    INVALID_ROLE_PREFERENCE = 4003,
 }
 
 return error_code

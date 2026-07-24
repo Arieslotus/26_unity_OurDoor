@@ -1,5 +1,5 @@
 --- <summary>
---- 实现功能：按关卡执行 FIFO 匹配，复用房间创建/加入流程并负责取消与掉线移除。
+--- 实现功能：按关卡模式和身份偏好执行全局 FIFO 匹配，并负责房间创建、取消与掉线移除。
 --- </summary>
 local skynet = require "skynet"
 local queue = require "skynet.queue"
@@ -18,22 +18,36 @@ local function validate_account(account, agent)
         and account.agent == agent
 end
 
-local function response(code, message, queued, level_id)
+local function response(code, message, queued, level_id, role_preference)
     return {
         code = code,
         message = message,
         queued = queued or false,
         levelId = level_id or 0,
+        rolePreference = role_preference,
     }
 end
 
-local function cancel_response(code, message, removed, level_id)
+local function cancel_response(
+    code,
+    message,
+    removed,
+    level_id,
+    role_preference
+)
     return {
         code = code,
         message = message,
         removed = removed or false,
         levelId = level_id or 0,
+        rolePreference = role_preference,
     }
+end
+
+local function is_valid_role_preference(role_preference)
+    return role_preference == "Any"
+        or role_preference == "Outer"
+        or role_preference == "Inner"
 end
 
 local function requeue_first_after_room_failure(first, failure_message)
@@ -54,14 +68,21 @@ local function requeue_first_after_room_failure(first, failure_message)
     ))
 end
 
-local function create_matched_room(first, second)
+local function create_matched_room(
+    first,
+    second,
+    matched_level_id,
+    first_role,
+    second_role
+)
     local created = skynet.call(
         room_service,
         "lua",
         "CREATE_ROOM",
         first.account,
         first.agent,
-        first.level_id
+        matched_level_id,
+        first_role
     )
     if created.code ~= error_code.OK then
         requeue_first_after_room_failure(
@@ -111,8 +132,8 @@ local function create_matched_room(first, second)
 
     if created.roomId ~= joined.roomId
         or created.levelId ~= joined.levelId
-        or created.role ~= "Outer"
-        or joined.role ~= "Inner"
+        or created.role ~= first_role
+        or joined.role ~= second_role
         or joined.revision <= created.revision then
         error(string.format(
             "[M6 Match] 复用房间流程返回的数据不一致，"
@@ -141,20 +162,37 @@ local function notify_match_found(entry, room, role, was_queued)
         role = role,
         revision = room.revision,
         wasQueued = was_queued,
+        requestedLevelId = entry.level_id,
+        rolePreference = entry.role_preference,
     })
 end
 
-function command.REQUEST(account, agent, level_id)
+function command.REQUEST(account, agent, level_id, role_preference)
     if not validate_account(account, agent) then
         return response(error_code.NOT_LOGGED_IN, "账号或连接身份无效")
     end
     if type(level_id) ~= "number"
         or level_id % 1 ~= 0
-        or level_id < 1
+        or level_id < 0
         or level_id > 3 then
         return response(
             error_code.INVALID_LEVEL,
-            string.format("levelId 必须是 1、2、3，当前=%s", tostring(level_id))
+            string.format(
+                "levelId 必须是 0、1、2、3，当前=%s",
+                tostring(level_id)
+            )
+        )
+    end
+    if not is_valid_role_preference(role_preference) then
+        return response(
+            error_code.INVALID_ROLE_PREFERENCE,
+            string.format(
+                "rolePreference 必须是 Any、Outer、Inner，当前=%s",
+                tostring(role_preference)
+            ),
+            false,
+            level_id,
+            role_preference
         )
     end
     if waiting:contains(account.uid) then
@@ -162,7 +200,8 @@ function command.REQUEST(account, agent, level_id)
             error_code.ALREADY_MATCHING,
             string.format("账号已经在匹配队列中，uid=%s", account.uid),
             false,
-            level_id
+            level_id,
+            role_preference
         )
     end
 
@@ -171,6 +210,7 @@ function command.REQUEST(account, agent, level_id)
         agent = agent,
         account = account,
         level_id = level_id,
+        role_preference = role_preference,
     }
     local result = waiting:request(entry)
     if not result.matched then
@@ -182,32 +222,63 @@ function command.REQUEST(account, agent, level_id)
             waiting:count(level_id),
             waiting:count()
         ))
-        return response(error_code.OK, "OK", true, level_id)
+        return response(
+            error_code.OK,
+            "OK",
+            true,
+            level_id,
+            role_preference
+        )
     end
 
     local room, room_error =
-        create_matched_room(result.first, result.second)
+        create_matched_room(
+            result.first,
+            result.second,
+            result.level_id,
+            result.first_role,
+            result.second_role
+        )
     if not room then
         return response(
             room_error.code,
             room_error.message,
             false,
-            level_id
+            level_id,
+            role_preference
         )
     end
 
-    notify_match_found(result.first, room, "Outer", true)
-    notify_match_found(result.second, room, "Inner", false)
+    notify_match_found(
+        result.first,
+        room,
+        result.first_role,
+        true
+    )
+    notify_match_found(
+        result.second,
+        room,
+        result.second_role,
+        false
+    )
     skynet.error(string.format(
-        "[M6 Match] FIFO 配对成功，roomId=%s, levelId=%d, "
-            .. "outer=%s, inner=%s, totalWaiting=%d",
+        "[M7 Match] FIFO 配对成功，roomId=%s, levelId=%d, "
+            .. "first=%s(%s), second=%s(%s), totalWaiting=%d",
         room.room_id,
         room.level_id,
         result.first.uid,
+        result.first_role,
         result.second.uid,
+        result.second_role,
         waiting:count()
     ))
-    return response(error_code.OK, "OK", false, level_id)
+    return response(
+        error_code.OK,
+        "OK",
+        false,
+        level_id,
+        role_preference
+    )
 end
 
 function command.CANCEL(account, agent)
@@ -233,7 +304,8 @@ function command.CANCEL(account, agent)
         error_code.OK,
         "OK",
         true,
-        removed.level_id
+        removed.level_id,
+        removed.role_preference
     )
 end
 

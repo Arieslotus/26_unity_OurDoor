@@ -32,9 +32,11 @@ namespace OurDoor.LXY.Networking.Services
 
         public async Task<string> CreateRoomAsync(
             int levelId,
+            string rolePreference,
             CancellationToken cancellationToken = default)
         {
             ValidateLevelId(levelId);
+            RolePreferences.Validate(rolePreference, nameof(rolePreference));
             RequireLobby();
             BeginRoomRequest();
             try
@@ -42,7 +44,11 @@ namespace OurDoor.LXY.Networking.Services
                 var response =
                     await _network.SendRequestAsync<CreateRoomRequest, CreateRoomResponse>(
                         MessageIds.CreateRoom,
-                        new CreateRoomRequest { levelId = levelId },
+                        new CreateRoomRequest
+                        {
+                            levelId = levelId,
+                            rolePreference = rolePreference
+                        },
                         cancellationToken);
 
                 if (response.code != ServerErrorCodes.Success)
@@ -51,6 +57,14 @@ namespace OurDoor.LXY.Networking.Services
                         MessageIds.CreateRoom,
                         response.code,
                         response.message);
+                }
+                if (!RolePreferences.AcceptsRole(
+                        rolePreference,
+                        response.role))
+                {
+                    throw new InvalidOperationException(
+                        $"[房间服务] 创建房间返回的身份不符合偏好，" +
+                        $"preference={rolePreference}, role={response.role}。");
                 }
 
                 _session.EnterWaitingRoom(

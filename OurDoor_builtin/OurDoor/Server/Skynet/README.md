@@ -1,4 +1,4 @@
-# LXY M6 Skynet 服务端
+# LXY M7 Skynet 服务端
 
 ## M3 必需配置
 
@@ -65,7 +65,7 @@ LXY M3 level rule tests passed
 LXY M4 level rule tests passed
 LXY M5 lifecycle protocol tests passed
 LXY M6 match protocol tests passed
-LXY M6 FIFO match queue tests passed
+LXY M7 role and any-level match queue tests passed
 ```
 
 ## M2 行为
@@ -74,7 +74,8 @@ LXY M6 FIFO match queue tests passed
 - 同一 guestId 同时只能被一个连接占用。
 - 未登录连接不能创建或加入房间。
 - 房间固定两人。
-- 创建者为 `Outer`，加入者为 `Inner`。
+- M7 中创建者可选择身份；选择 `Any` 时创建者为 `Outer`，加入者始终
+  取得相反身份。
 - 第二人加入后，先向两端推送相同初始快照，再分别推送
   `ROOM_READY`。
 - 错误房间码、第三人加入和非法 levelId 返回明确业务错误。
@@ -120,11 +121,24 @@ LXY M6 FIFO match queue tests passed
 ## M6 行为
 
 - `MATCH_REQUEST=210`、`MATCH_CANCEL=211`、`MATCH_FOUND=903`。
-- 每个 `levelId` 使用独立 FIFO 队列，不同关卡不会配对。
-- 同关卡先入队者为 `Outer`，后入队者为 `Inner`。
+- 匹配队列在 M7 扩展为全局 FIFO 兼容搜索；不同指定关卡仍不会配对。
+- 身份分配在 M7 扩展为身份偏好；两个 `Any` 时先入队者为 `Outer`。
 - 配对时直接调用 M2 的 `CREATE_ROOM` 和 `JOIN_ROOM`，因此房间结构、
   初始快照、revision 和 `ROOM_READY` 与房间码加入完全一致。
 - 主动取消会删除 FIFO 项和 uid 索引；重复请求返回 `4001`，未在队列时
   取消返回 `4002`。
 - 连接关闭、socket 异常和心跳超时均先移除匹配项，再执行房间与账号清理。
 - 清理日志额外包含 `matchRemoved` 和 `remainingMatches`。
+
+## M7 行为
+
+- `MATCH_REQUEST.levelId=0` 表示任意关卡；与指定关卡玩家匹配时使用
+  对方关卡，两个任意关卡玩家匹配时使用第一关。
+- 创建房间和匹配请求必须携带
+  `rolePreference=Outer/Inner/Any`，非法值返回 `4003`。
+- 创建房间时尊重创建者固定身份；房间码加入者取得相反身份。创建者选择
+  `Any` 时保持原规则，即创建者 `Outer`。
+- 匹配使用全局进入顺序查找最早兼容玩家。不同指定关卡不兼容；相同固定
+  身份不兼容。
+- 固定身份与 `Any` 匹配时固定身份保持不变；两个 `Any` 匹配时先入队者
+  `Outer`、后入队者 `Inner`。

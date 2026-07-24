@@ -17,6 +17,16 @@ local function is_blank(value)
         or string.find(value, "%S") == nil
 end
 
+local function resolve_creator_roles(role_preference)
+    if role_preference == "Any" or role_preference == "Outer" then
+        return "Outer", "Inner"
+    end
+    if role_preference == "Inner" then
+        return "Inner", "Outer"
+    end
+    return nil, nil
+end
+
 local function response(code, message, room, role)
     local result = {
         code = code,
@@ -202,7 +212,12 @@ end
 
 local command = {}
 
-function command.CREATE_ROOM(account, agent, level_id)
+function command.CREATE_ROOM(
+    account,
+    agent,
+    level_id,
+    role_preference
+)
     if not validate_account(account, agent) then
         return response(error_code.NOT_LOGGED_IN, "账号或连接身份无效")
     end
@@ -221,6 +236,17 @@ function command.CREATE_ROOM(account, agent, level_id)
             string.format("levelId 必须是 1、2、3，当前=%s", tostring(level_id))
         )
     end
+    local creator_role, joiner_role =
+        resolve_creator_roles(role_preference)
+    if not creator_role then
+        return response(
+            error_code.INVALID_ROLE_PREFERENCE,
+            string.format(
+                "rolePreference 必须是 Any、Outer 或 Inner，当前=%s",
+                tostring(role_preference)
+            )
+        )
+    end
 
     local room_id = next_room_id()
     local room = {
@@ -232,11 +258,12 @@ function command.CREATE_ROOM(account, agent, level_id)
         processed_action_ids = {},
         processed_action_order = {},
         ready_next_by_uid = {},
+        joiner_role = joiner_role,
         players = {
             {
                 uid = account.uid,
                 display_name = account.display_name,
-                role = "Outer",
+                role = creator_role,
                 agent = agent,
             },
         },
@@ -245,12 +272,15 @@ function command.CREATE_ROOM(account, agent, level_id)
     room_by_uid[account.uid] = room_id
 
     skynet.error(string.format(
-        "[M2 Room] 房间已创建，roomId=%s, levelId=%d, outer=%s",
+        "[M7 Room] 房间已创建，roomId=%s, levelId=%d, "
+            .. "creator=%s, creatorRole=%s, joinerRole=%s",
         room_id,
         level_id,
-        account.uid
+        account.uid,
+        creator_role,
+        joiner_role
     ))
-    return response(error_code.OK, "OK", room, "Outer")
+    return response(error_code.OK, "OK", room, creator_role)
 end
 
 function command.JOIN_ROOM(account, agent, room_id)
@@ -290,7 +320,7 @@ function command.JOIN_ROOM(account, agent, room_id)
     room.players[2] = {
         uid = account.uid,
         display_name = account.display_name,
-        role = "Inner",
+        role = room.joiner_role,
         agent = agent,
     }
     room_by_uid[account.uid] = room_id
@@ -298,13 +328,14 @@ function command.JOIN_ROOM(account, agent, room_id)
     room.revision = room.revision + 1
 
     skynet.error(string.format(
-        "[M2 Room] 玩家加入，roomId=%s, inner=%s, revision=%d",
+        "[M7 Room] 玩家加入，roomId=%s, joiner=%s, role=%s, revision=%d",
         room_id,
         account.uid,
+        room.joiner_role,
         room.revision
     ))
     push_room_ready(room)
-    return response(error_code.OK, "OK", room, "Inner")
+    return response(error_code.OK, "OK", room, room.joiner_role)
 end
 
 function command.LEAVE_CONNECTION(account, agent, reason)

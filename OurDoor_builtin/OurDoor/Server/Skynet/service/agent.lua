@@ -1,5 +1,5 @@
 --- <summary>
---- 实现功能：管理单个 TCP 连接、匹配/房间请求、心跳、串行推送与统一退出清理。
+--- 实现功能：管理单个 TCP 连接、身份偏好匹配、房间请求、心跳、串行推送与统一退出清理。
 --- </summary>
 local skynet = require "skynet"
 local socket = require "skynet.socket"
@@ -18,6 +18,7 @@ local lobby_service
 local account
 local room_id
 local matching_level_id
+local matching_role_preference
 local write_lock = queue()
 local closing = false
 local close_after_response = false
@@ -113,6 +114,7 @@ local function cleanup_connection(reason)
     local cleanup_account = account
     local cleanup_room_id = room_id
     local cleanup_matching_level_id = matching_level_id
+    local cleanup_matching_role_preference = matching_role_preference
     local errors = {}
     local room_result
     local remaining_accounts
@@ -153,6 +155,7 @@ local function cleanup_connection(reason)
     account = nil
     room_id = nil
     matching_level_id = nil
+    matching_role_preference = nil
     last_heartbeat_tick = nil
 
     if #errors > 0 then
@@ -171,13 +174,15 @@ local function cleanup_connection(reason)
 
     skynet.error(string.format(
         "[M6 Agent] 连接清理完成，fd=%d, uid=%s, roomId=%s, "
-            .. "matchingLevelId=%s, reason=%s, matchRemoved=%s, "
+            .. "matchingLevelId=%s, matchingRolePreference=%s, "
+            .. "reason=%s, matchRemoved=%s, "
             .. "remainingMatches=%s, roomRemoved=%s, remainingRooms=%s, "
             .. "remainingRoomIndexes=%s, remainingAccounts=%s",
         fd,
         logged_uid or "未登录",
         cleanup_room_id or "无",
         cleanup_matching_level_id and tostring(cleanup_matching_level_id) or "无",
+        cleanup_matching_role_preference or "无",
         reason,
         room_result and tostring(room_result.matchRemoved) or "false",
         room_result and tostring(room_result.remainingMatches) or "未登录",
@@ -289,7 +294,8 @@ local function handle_create_room(envelope)
         "CREATE_ROOM",
         account,
         skynet.self(),
-        body.levelId
+        body.levelId,
+        body.rolePreference
     )
     if result.code == error_code.OK then
         room_id = result.roomId
@@ -369,10 +375,12 @@ local function handle_match_request(envelope)
         "MATCH_REQUEST",
         account,
         skynet.self(),
-        body.levelId
+        body.levelId,
+        body.rolePreference
     )
     if result.code == error_code.OK and result.queued then
         matching_level_id = result.levelId
+        matching_role_preference = result.rolePreference
     end
     send_response(envelope.message_id, envelope.session, result)
 end
@@ -410,6 +418,7 @@ local function handle_match_cancel(envelope)
     )
     if result.code == error_code.OK then
         matching_level_id = nil
+        matching_role_preference = nil
     end
     send_response(envelope.message_id, envelope.session, result)
 end
@@ -629,6 +638,13 @@ skynet.start(function()
                 or found.levelId < 1
                 or found.levelId > 3
                 or (found.role ~= "Outer" and found.role ~= "Inner")
+                or type(found.requestedLevelId) ~= "number"
+                or found.requestedLevelId % 1 ~= 0
+                or found.requestedLevelId < 0
+                or found.requestedLevelId > 3
+                or (found.rolePreference ~= "Any"
+                    and found.rolePreference ~= "Outer"
+                    and found.rolePreference ~= "Inner")
                 or type(found.revision) ~= "number"
                 or found.revision % 1 ~= 0
                 or found.revision < 0
@@ -658,26 +674,58 @@ skynet.start(function()
                 ))
             end
             if found.wasQueued then
-                if matching_level_id ~= found.levelId then
+                if matching_level_id ~= found.requestedLevelId then
                     error(string.format(
-                        "[M6 Agent] 先入队玩家的匹配关卡不一致，"
+                        "[M7 Agent] 先入队玩家的匹配模式不一致，"
                             .. "local=%s, found=%d, uid=%s",
                         tostring(matching_level_id),
+                        found.requestedLevelId,
+                        account.uid
+                    ))
+                end
+                if matching_role_preference ~= found.rolePreference then
+                    error(string.format(
+                        "[M7 Agent] 先入队玩家的身份偏好不一致，"
+                            .. "local=%s, found=%s, uid=%s",
+                        tostring(matching_role_preference),
+                        found.rolePreference,
+                        account.uid
+                    ))
+                end
+                if found.requestedLevelId ~= 0
+                    and found.requestedLevelId ~= found.levelId then
+                    error(string.format(
+                        "[M7 Agent] 指定关卡匹配结果不一致，"
+                            .. "requested=%d, found=%d, uid=%s",
+                        found.requestedLevelId,
                         found.levelId,
                         account.uid
                     ))
                 end
-            elseif matching_level_id ~= nil then
+                if found.rolePreference ~= "Any"
+                    and found.rolePreference ~= found.role then
+                    error(string.format(
+                        "[M7 Agent] 匹配结果不满足身份偏好，"
+                            .. "preference=%s, found=%s, uid=%s",
+                        found.rolePreference,
+                        found.role,
+                        account.uid
+                    ))
+                end
+            elseif matching_level_id ~= nil
+                or matching_role_preference ~= nil then
                 error(string.format(
-                    "[M6 Agent] 后入队玩家意外存在旧匹配关卡，"
-                        .. "local=%d, found=%d, uid=%s",
-                    matching_level_id,
+                    "[M7 Agent] 后入队玩家意外存在旧匹配状态，"
+                        .. "localLevel=%s, localRole=%s, found=%d, uid=%s",
+                    tostring(matching_level_id),
+                    tostring(matching_role_preference),
                     found.levelId,
                     account.uid
                 ))
             end
 
             matching_level_id = nil
+            matching_role_preference = nil
             room_id = found.roomId
             send_envelope(
                 protocol.MESSAGE_ID.MATCH_FOUND,
