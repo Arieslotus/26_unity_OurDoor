@@ -1,0 +1,6 @@
+@echo off
+chcp 65001 >nul
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0HostTools\Invoke-OurDoorHost.ps1" -Action Stop -PackageRoot "%~dp0."
+set "EXIT_CODE=%ERRORLEVEL%"
+if not "%EXIT_CODE%"=="0" pause
+exit /b %EXIT_CODE%

@@ -1,4 +1,4 @@
-# LXY M7 Skynet 服务端
+# LXY M8 Skynet 服务端
 
 ## M3 必需配置
 
@@ -142,3 +142,19 @@ LXY M7 role and any-level match queue tests passed
   身份不兼容。
 - 固定身份与 `Any` 匹配时固定身份保持不变；两个 `Any` 匹配时先入队者
   `Outer`、后入队者 `Inner`。
+
+## M8 自动管理
+
+统一发布包把本目录复制到 `HostTools/Server/Skynet`。电脑 A 的高权限计划
+任务通过包内 `run.sh` 启动服务端，记录并校验准确 PID、Skynet 可执行文件
+和 config 参数。
+
+- 重复启动复用已验证的同一进程。
+- 失效 PID 会清理，但 PID 指向其他进程时绝不终止。
+- 停服只向已验证的 OurDoor Skynet 发送 TERM，必要时在 PID 启动时间仍
+  一致的条件下发送 KILL。
+- 不执行 `wsl --shutdown`。
+- Skynet 输出写入完整包的 `Logs/Server/skynet-latest.log`。
+
+源码侧仍可使用本 README 前面的手动启动命令；M8 发布方式见
+`Deployment/README.md`。

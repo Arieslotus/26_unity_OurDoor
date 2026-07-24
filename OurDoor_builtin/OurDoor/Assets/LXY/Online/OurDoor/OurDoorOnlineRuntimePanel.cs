@@ -1,9 +1,11 @@
 /// <summary>
-/// 实现功能：提供自动连接、临时登录、房间、匹配、身份选择、运行时通知与 Enter 开关的最终联网界面。
+/// 实现功能：从严格部署配置自动连接，并提供登录、房间、匹配、通知与 Enter 开关的最终联网界面。
 /// </summary>
 using System;
 using System.Collections;
 using System.Threading.Tasks;
+using OurDoor.LXY.Networking;
+using OurDoor.LXY.Networking.Deployment;
 using OurDoor.LXY.Networking.Protocol;
 using OurDoor.LXY.Networking.Session;
 using UnityEngine;
@@ -26,10 +28,6 @@ public sealed class OurDoorOnlineRuntimePanel : MonoBehaviour
     [Header("联网控制器")]
     [SerializeField] private OurDoorOnlineController onlineController;
 
-    [Header("服务端")]
-    [SerializeField] private string host = "127.0.0.1";
-    [SerializeField] private int port = 8888;
-
     [Header("玩家")]
     [SerializeField] private string displayName = "Player";
 
@@ -44,6 +42,7 @@ public sealed class OurDoorOnlineRuntimePanel : MonoBehaviour
     private bool noticeVisible;
     private bool operationRunning;
     private bool autoConnectFailed;
+    private bool configurationLoadFailed;
     private bool initialized;
     private bool intentionalDisconnect;
     private OnlineSessionState previousState;
@@ -51,6 +50,8 @@ public sealed class OurDoorOnlineRuntimePanel : MonoBehaviour
     private LobbyPage lobbyPage;
     private int draftLevelId;
     private string draftRolePreference;
+    private string deploymentConfigPath;
+    private DeploymentEndpointConfig deploymentEndpoint;
 
     private PCFirstPersonController controlledPlayer;
     private bool savedControlEnabled;
@@ -87,13 +88,6 @@ public sealed class OurDoorOnlineRuntimePanel : MonoBehaviour
             throw new InvalidOperationException(
                 "[M7 联网界面] Online Controller 尚未完成 Awake 初始化。");
         }
-        if (string.IsNullOrWhiteSpace(host))
-            throw new InvalidOperationException("[M7 联网界面] Host 不能为空。");
-        if (port < 1 || port > 65535)
-        {
-            throw new InvalidOperationException(
-                $"[M7 联网界面] Port 必须在 1-65535，当前={port}。");
-        }
         if (panelWidth < 360f)
         {
             throw new InvalidOperationException(
@@ -107,11 +101,9 @@ public sealed class OurDoorOnlineRuntimePanel : MonoBehaviour
         onlineController.PlayerLeft += OnPlayerLeft;
         SceneManager.sceneLoaded += OnSceneLoaded;
         initialized = true;
-
-        RunOperation(
-            () => onlineController.ConnectAsync(host, port),
-            "自动连接服务端",
-            true);
+        deploymentConfigPath =
+            DeploymentEndpointConfigLoader.GetDefaultPath();
+        LoadConfigurationAndConnect();
     }
 
     private void Update()
@@ -167,20 +159,7 @@ public sealed class OurDoorOnlineRuntimePanel : MonoBehaviour
         switch (state)
         {
             case OnlineSessionState.Disconnected:
-                GUILayout.Label(
-                    autoConnectFailed
-                        ? $"自动连接 {host}:{port} 失败。"
-                        : $"正在自动连接 {host}:{port}……");
-                GUI.enabled = autoConnectFailed && !operationRunning;
-                if (GUILayout.Button("重试连接"))
-                {
-                    autoConnectFailed = false;
-                    RunOperation(
-                        () => onlineController.ConnectAsync(host, port),
-                        "重试连接服务端",
-                        true);
-                }
-                GUI.enabled = true;
+                DrawDisconnected();
                 return;
 
             case OnlineSessionState.Connected:
@@ -193,6 +172,92 @@ public sealed class OurDoorOnlineRuntimePanel : MonoBehaviour
         }
 
         DrawLoggedInContent(state);
+    }
+
+    private void DrawDisconnected()
+    {
+        if (configurationLoadFailed)
+        {
+            GUILayout.Label("联网部署配置无效，已停止自动连接。");
+            GUILayout.Label($"配置文件：{deploymentConfigPath}");
+        }
+        else if (autoConnectFailed)
+        {
+            GUILayout.Label(
+                $"连接失败：{deploymentEndpoint?.ToString() ?? "端点未加载"}");
+            GUILayout.Label($"配置文件：{deploymentConfigPath}");
+        }
+        else
+        {
+            GUILayout.Label(
+                deploymentEndpoint == null
+                    ? $"正在读取部署配置：{deploymentConfigPath}"
+                    : $"正在连接：{deploymentEndpoint}");
+        }
+
+        GUI.enabled =
+            (configurationLoadFailed || autoConnectFailed) &&
+            !operationRunning;
+        if (GUILayout.Button("重新读取配置并连接"))
+        {
+            LoadConfigurationAndConnect();
+        }
+        GUI.enabled = true;
+    }
+
+    private void LoadConfigurationAndConnect()
+    {
+        if (operationRunning)
+        {
+            throw new InvalidOperationException(
+                "[M8 联网界面] 网络操作执行中不能重新读取部署配置。");
+        }
+
+        configurationLoadFailed = false;
+        autoConnectFailed = false;
+        deploymentEndpoint = null;
+        try
+        {
+            NetworkManager manager = NetworkManager.Instance;
+            if (manager == null)
+            {
+                throw new InvalidOperationException(
+                    "[M8 联网界面] NetworkManager 尚未初始化。");
+            }
+
+            deploymentEndpoint =
+                DeploymentEndpointConfigLoader.LoadAndApply(
+                    manager.Config,
+                    deploymentConfigPath);
+        }
+        catch (DeploymentConfigException exception)
+        {
+            configurationLoadFailed = true;
+            operationStatus = "部署配置读取失败";
+            ShowNotice(
+                $"联网配置无效，未发起连接。\n" +
+                $"配置文件：{deploymentConfigPath}\n" +
+                $"原因：{exception.Message}");
+            Debug.LogError(
+                $"[M8 联网界面] 部署配置读取失败，" +
+                $"path={deploymentConfigPath}, error={exception.Message}");
+            Debug.LogException(exception);
+            return;
+        }
+
+        string connectionContext =
+            $"配置文件：{deploymentEndpoint.SourcePath}；" +
+            $"端点：{deploymentEndpoint.Host}:{deploymentEndpoint.Port}";
+        Debug.Log(
+            $"[M8 联网界面] 已读取部署配置，{connectionContext}。");
+        RunOperation(
+            () => onlineController.ConnectAsync(
+                deploymentEndpoint.Host,
+                deploymentEndpoint.Port),
+            "自动连接服务端",
+            true,
+            false,
+            connectionContext);
     }
 
     private void DrawLogin()
@@ -460,14 +525,19 @@ public sealed class OurDoorOnlineRuntimePanel : MonoBehaviour
     private void DrawNotice()
     {
         const float noticeWidth = 500f;
-        const float noticeHeight = 100f;
+        const float noticeHeight = 160f;
         float y = Mathf.Max(0f, Screen.height - noticeHeight - 20f);
         Rect area = new Rect(20f, y, noticeWidth, noticeHeight);
         GUI.Box(area, GUIContent.none);
 
+        var noticeStyle = new GUIStyle(GUI.skin.label)
+        {
+            wordWrap = true
+        };
         GUI.Label(
             new Rect(area.x + 12f, area.y + 10f, area.width - 55f, area.height - 20f),
-            notice);
+            notice,
+            noticeStyle);
         if (GUI.Button(
                 new Rect(area.xMax - 38f, area.y + 8f, 28f, 28f),
                 "×"))
@@ -589,7 +659,8 @@ public sealed class OurDoorOnlineRuntimePanel : MonoBehaviour
         Func<Task> operation,
         string operationName,
         bool notifyFailure,
-        bool intentionalLeave = false)
+        bool intentionalLeave = false,
+        string failureContext = null)
     {
         if (operation == null)
             throw new ArgumentNullException(nameof(operation));
@@ -614,10 +685,17 @@ public sealed class OurDoorOnlineRuntimePanel : MonoBehaviour
                 autoConnectFailed = true;
             operationStatus = operationName + "失败";
             if (notifyFailure)
-                ShowNotice($"{operationName}失败：{exception.Message}");
+            {
+                ShowNotice(
+                    $"{operationName}失败：{exception.Message}" +
+                    (string.IsNullOrWhiteSpace(failureContext)
+                        ? string.Empty
+                        : $"\n{failureContext}"));
+            }
             Debug.LogError(
                 $"[M7 联网界面] {operationName}失败，" +
-                $"state={onlineController.Session.State}, object={gameObject.name}。");
+                $"state={onlineController.Session.State}, object={gameObject.name}, " +
+                $"context={failureContext ?? "无"}。");
             Debug.LogException(exception);
         }
         finally

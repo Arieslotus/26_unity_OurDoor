@@ -10,6 +10,7 @@
 - M5：退出、对端通知、账号/房间清理和生产心跳，已验收。
 - M6：按关卡 FIFO 匹配、取消和掉线清理，已验收。
 - M7：最终运行时联网 UI、任意关卡匹配和身份偏好，代码完成，等待验收。
+- M8：局域网部署配置、一键主机管理与完整包组装，代码完成，等待验收。
 
 ## M2 手动配置
 
@@ -128,17 +129,16 @@ M4 不要求给第二、三关额外挂同步组件；`OurDoorOnlineController` 
 1. 增加 `OurDoorOnlineRuntimePanel`。
 2. 将 `Online Controller` 指向同一对象的
    `OurDoorOnlineController`。
-3. `Host` 保持 `127.0.0.1`、`Port` 保持 `8888`；部署到其他机器时再
-   手动修改。
-4. 禁用 `M2LobbyDebugPanel`、`M3Level1DebugPanel`、
+3. 禁用 `M2LobbyDebugPanel`、`M3Level1DebugPanel`、
    `M4LevelDebugPanel`、`M5ExitDebugPanel`，不要删除源码。
 
 最终面板默认关闭，主键盘或小键盘 Enter 打开/关闭。打开时释放光标并
 暂停本地第一人称操作，关闭后恢复；面板跨关卡保持当前开关状态。重要通知
 固定显示在左下角，可点 `×` 关闭；锁定光标时可按 Backspace 关闭。
 
-运行后自动连接服务端。连接失败才显示“重试连接”。临时 ID 是每次启动随机
-生成的 4 位小写字母/数字组合，不提供手工输入。
+运行后按 M8 的 `ourdoor-network.json` 自动连接服务端。配置无效或连接失败
+时显示“重新读取配置并连接”。临时 ID 是每次启动随机生成的 4 位小写字母/
+数字组合，不提供手工输入。
 
 登录后的一级页面提供“创建房间、加入房间、匹配”三个入口：
 
@@ -162,3 +162,31 @@ M4 不要求给第二、三关额外挂同步组件；`OurDoorOnlineController` 
 
 Unity Test Runner 的 EditMode 中运行 `LXY.Networking.EditModeTests`。
 服务端 Lua 测试见 `Server/Skynet/README.md`。
+
+## M8 客户端部署配置
+
+最终面板不再读取 Inspector 中的 Host/Port。Editor 使用项目根目录、
+Windows Build 使用 `OurDoor.exe` 同目录的：
+
+```text
+ourdoor-network.json
+```
+
+严格格式：
+
+```json
+{
+  "host": "192.168.1.100",
+  "port": 8888
+}
+```
+
+只允许 `host`、`port` 两个字段。文件缺失、非 UTF-8、非法 JSON、重复
+字段、缺失字段、未知字段、空 Host、非法 IPv4/主机名或越界 Port 都会停止
+自动连接，并在通知和日志中显示配置路径及原因。不会回退到
+`127.0.0.1`。
+
+项目根目录当前配置用于 Editor 本机调试。发布包内的配置先保持无效，电脑 A
+运行主机安装程序后写入所选局域网 IPv4，再把同一完整包复制给 B/C。
+
+主机管理和打包方式见 `Deployment/README.md`。
