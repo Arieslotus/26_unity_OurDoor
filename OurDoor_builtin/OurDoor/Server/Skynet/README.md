@@ -1,4 +1,4 @@
-# LXY M3 Skynet 服务端
+# LXY M4 Skynet 服务端
 
 ## M3 必需配置
 
@@ -50,6 +50,7 @@ lxy_port = 8888
 ~/skynet/3rd/lua/lua Server/Skynet/tests/test_packet.lua
 ~/skynet/3rd/lua/lua Server/Skynet/tests/test_json.lua
 ~/skynet/3rd/lua/lua Server/Skynet/tests/test_level_rules.lua
+~/skynet/3rd/lua/lua Server/Skynet/tests/test_m4_level_rules.lua
 ```
 
 通过标志：
@@ -58,6 +59,7 @@ lxy_port = 8888
 LXY M1 Lua packet tests passed
 LXY M2 Lua JSON tests passed
 LXY M3 level rule tests passed
+LXY M4 level rule tests passed
 ```
 
 ## M2 行为
@@ -86,3 +88,14 @@ guestId，或者重启 Skynet 服务端。
   `duplicate=true`，不再次改变状态。
 - 通用房间服务通过 `game_rule` 调用 `games/ourdoor`，其他项目可替换
   `lxy_game_rule_module` 使用自己的规则模块。
+
+## M4 行为
+
+- 第二关 4 个、第三关 5 个 action 均由 `games/ourdoor` 校验。
+- 第三关 `METAL_RECEIVED` 由 Outer 把铁片递入门缝时提交。
+- `READY_NEXT_LEVEL=301` 只接受已经完成且不是第三关的房间。
+- 每个账号只占一个准备槽位；只有两名成员均准备后才切换。
+- 切换时继续使用同一房间和角色，revision 增加一次，重建下一关状态。
+- `LEVEL_CHANGED=904` 在一个推送中携带目标关卡和完整初始快照，避免
+  客户端先后收到关卡号与快照造成中间状态。
+- 选择第一关按 `1→2→3`，选择第二关按 `2→3`，选择第三关不再换关。

@@ -1,5 +1,5 @@
 /// <summary>
-/// 实现功能：组合登录、房间与关卡操作服务，并在进入第一关后应用服务端权威快照。
+/// 实现功能：组合登录、房间、三关权威同步与服务端确认的连续换关流程。
 /// </summary>
 using System;
 using System.Threading;
@@ -22,8 +22,11 @@ public sealed class OurDoorOnlineController : MonoBehaviour
     private AuthService authService;
     private RoomService roomService;
     private LevelActionService levelActionService;
-    private OurDoorLevel1SnapshotSynchronizer level1Synchronizer;
+    private LevelFlowService levelFlowService;
+    private IDisposable levelSynchronizer;
+    private OurDoorOnlineLevelFlow onlineLevelFlow;
     private RoomReadyDto pendingRoomReady;
+    private LevelChangedDto pendingLevelChanged;
     private Exception levelActionFailure;
     private bool destroying;
 
@@ -55,7 +58,9 @@ public sealed class OurDoorOnlineController : MonoBehaviour
         authService = new AuthService(network, Session);
         roomService = new RoomService(network, Session);
         levelActionService = new LevelActionService(network, Session);
+        levelFlowService = new LevelFlowService(network, Session);
         roomService.RoomReady += OnRoomReady;
+        levelFlowService.LevelChanged += OnLevelChanged;
         network.ConnectionLost += OnConnectionLost;
     }
 
@@ -145,13 +150,24 @@ public sealed class OurDoorOnlineController : MonoBehaviour
             cancellation.Token);
     }
 
-    private void OnRoomReady(RoomReadyDto ready)
+    public Task<ReadyNextLevelResponse> ReadyForNextLevelAsync()
     {
-        if (pendingRoomReady != null)
+        if (onlineLevelFlow == null)
         {
             throw new InvalidOperationException(
-                $"[M3 在线控制器] 上一个关卡仍在加载，" +
-                $"roomId={pendingRoomReady.roomId}, levelId={pendingRoomReady.levelId}。");
+                $"[M4 在线控制器] 当前关卡没有启用连续换关流程，" +
+                $"levelId={Session.LevelId}。");
+        }
+
+        return onlineLevelFlow.ReadyNowAsync();
+    }
+
+    private void OnRoomReady(RoomReadyDto ready)
+    {
+        if (pendingRoomReady != null || pendingLevelChanged != null)
+        {
+            throw new InvalidOperationException(
+                "[M4 在线控制器] 上一个关卡仍在加载，不能处理 ROOM_READY。");
         }
 
         Debug.Log(
@@ -183,38 +199,132 @@ public sealed class OurDoorOnlineController : MonoBehaviour
 
     private void OnLevelSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        RoomReadyDto ready = pendingRoomReady;
         SceneManager.sceneLoaded -= OnLevelSceneLoaded;
-        pendingRoomReady = null;
 
-        if (ready == null)
+        if (pendingRoomReady != null)
         {
-            throw new InvalidOperationException(
-                $"[M3 在线控制器] 收到场景加载完成事件时缺少 ROOM_READY，" +
-                $"scene={scene.name}, mode={mode}。");
+            RoomReadyDto ready = pendingRoomReady;
+            pendingRoomReady = null;
+            ValidateLoadedScene(scene, mode, ready.levelId, "ROOM_READY");
+            ActivateLoadedLevel(ready.levelId);
+            Debug.Log(
+                $"[M4 在线控制器] 已进入联网关卡，roomId={ready.roomId}, " +
+                $"scene={scene.name}, role={ready.role}, revision={ready.revision}。");
+            return;
         }
 
-        string expectedScene = OurDoorSceneRouter.GetSceneName(ready.levelId);
+        if (pendingLevelChanged != null)
+        {
+            LevelChangedDto changed = pendingLevelChanged;
+            pendingLevelChanged = null;
+            ValidateLoadedScene(scene, mode, changed.toLevelId, "LEVEL_CHANGED");
+            ActivateLoadedLevel(changed.toLevelId);
+            Debug.Log(
+                $"[M4 在线控制器] 服务端已切换关卡，roomId={changed.roomId}, " +
+                $"from={changed.fromLevelId}, to={changed.toLevelId}, " +
+                $"revision={changed.revision}, role={changed.role}。");
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"[M4 在线控制器] 场景加载完成时没有待处理的联网关卡，" +
+            $"scene={scene.name}, mode={mode}。");
+    }
+
+    private void OnLevelChanged(LevelChangedDto changed)
+    {
+        if (changed == null)
+            throw new ArgumentNullException(nameof(changed));
+        if (pendingRoomReady != null || pendingLevelChanged != null)
+        {
+            throw new InvalidOperationException(
+                "[M4 在线控制器] 关卡加载期间又收到 LEVEL_CHANGED。");
+        }
+
+        DisposeLoadedLevelBindings();
+        pendingLevelChanged = changed;
+        SceneManager.sceneLoaded += OnLevelSceneLoaded;
+        try
+        {
+            OurDoorSceneRouter.LoadLevel(changed.toLevelId);
+        }
+        catch
+        {
+            SceneManager.sceneLoaded -= OnLevelSceneLoaded;
+            pendingLevelChanged = null;
+            throw;
+        }
+    }
+
+    private static void ValidateLoadedScene(
+        Scene scene,
+        LoadSceneMode mode,
+        int levelId,
+        string source)
+    {
+        string expectedScene = OurDoorSceneRouter.GetSceneName(levelId);
         if (!string.Equals(scene.name, expectedScene, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
-                $"[M3 在线控制器] 加载完成的场景与 ROOM_READY 不一致，" +
-                $"expected={expectedScene}, actual={scene.name}, " +
-                $"roomId={ready.roomId}, levelId={ready.levelId}。");
+                $"[M4 在线控制器] 加载场景与 {source} 不一致，" +
+                $"expected={expectedScene}, actual={scene.name}, levelId={levelId}。");
+        }
+        if (mode != LoadSceneMode.Single)
+        {
+            throw new InvalidOperationException(
+                $"[M4 在线控制器] 联网关卡必须使用 Single 模式加载，mode={mode}。");
+        }
+    }
+
+    private void ActivateLoadedLevel(int levelId)
+    {
+        if (levelSynchronizer != null || onlineLevelFlow != null)
+        {
+            throw new InvalidOperationException(
+                $"[M4 在线控制器] 激活关卡前旧绑定未释放，levelId={levelId}。");
         }
 
-        if (ready.levelId == 1)
+        switch (levelId)
         {
-            var synchronizer =
-                new OurDoorLevel1SnapshotSynchronizer(Session);
-            synchronizer.Activate();
-            level1Synchronizer = synchronizer;
+            case 1:
+                var level1 = new OurDoorLevel1SnapshotSynchronizer(Session);
+                level1.Activate();
+                levelSynchronizer = level1;
+                break;
+            case 2:
+                var level2 = new OurDoorLevel2SnapshotSynchronizer(Session);
+                level2.Activate();
+                levelSynchronizer = level2;
+                break;
+            case 3:
+                var level3 = new OurDoorLevel3SnapshotSynchronizer(Session);
+                level3.Activate();
+                levelSynchronizer = level3;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(levelId),
+                    $"[M4 在线控制器] 未知关卡：{levelId}。");
         }
 
         Session.MarkPlaying();
-        Debug.Log(
-            $"[M3 在线控制器] 已进入联网关卡，roomId={ready.roomId}, " +
-            $"scene={OurDoorSceneRouter.GetSceneName(ready.levelId)}, role={ready.role}。");
+        if (levelId < 3)
+        {
+            onlineLevelFlow =
+                new OurDoorOnlineLevelFlow(
+                    levelFlowService,
+                    Session,
+                    cancellation.Token);
+            onlineLevelFlow.Activate();
+        }
+    }
+
+    private void DisposeLoadedLevelBindings()
+    {
+        onlineLevelFlow?.Dispose();
+        onlineLevelFlow = null;
+        levelSynchronizer?.Dispose();
+        levelSynchronizer = null;
     }
 
     private bool SubmitOnlineIntent(OnlineActionIntent intent)
@@ -299,10 +409,13 @@ public sealed class OurDoorOnlineController : MonoBehaviour
         destroying = true;
         SceneManager.sceneLoaded -= OnLevelSceneLoaded;
         pendingRoomReady = null;
+        pendingLevelChanged = null;
         network.ConnectionLost -= OnConnectionLost;
         roomService.RoomReady -= OnRoomReady;
-        level1Synchronizer?.Dispose();
+        levelFlowService.LevelChanged -= OnLevelChanged;
+        DisposeLoadedLevelBindings();
         roomService.Dispose();
+        levelFlowService.Dispose();
         cancellation.Cancel();
         levelActionService.Dispose();
         cancellation.Dispose();

@@ -81,14 +81,16 @@ Assets/LXY/
 │   │   ├── ProtocolCodec.cs
 │   │   ├── ProtocolDtos.cs
 │   │   ├── LobbyDtos.cs
-│   │   └── LevelActionDtos.cs
+│   │   ├── LevelActionDtos.cs
+│   │   └── LevelFlowDtos.cs
 │   ├── Session/
 │   │   ├── NetworkSession.cs
 │   │   └── OnlineSessionState.cs
 │   ├── Services/
 │   │   ├── AuthService.cs
 │   │   ├── RoomService.cs
-│   │   └── LevelActionService.cs
+│   │   ├── LevelActionService.cs
+│   │   └── LevelFlowService.cs
 │   ├── NetworkManager.cs
 │   └── NetworkConfig.cs
 ├── Online/
@@ -100,10 +102,12 @@ Assets/LXY/
 │   │   ├── OurDoorSceneRouter.cs
 │   │   ├── OurDoorRoleAdapter.cs
 │   │   ├── OurDoorOnlineLevelSelectAdapter.cs
-│   │   └── OurDoorLevel1SnapshotSynchronizer.cs
+│   │   ├── OurDoorOnlineLevelFlow.cs
+│   │   └── OurDoorLevelXSnapshotSynchronizer / Presentation
 │   └── Debug/
 │       ├── M2LobbyDebugPanel.cs
-│       └── M3Level1DebugPanel.cs
+│       ├── M3Level1DebugPanel.cs
+│       └── M4LevelDebugPanel.cs
 └── Tests/
     └── EditMode/
 ```
@@ -286,10 +290,12 @@ byte[]     jsonBody      // UTF-8，无 BOM
 | 210 | `MATCH_REQUEST` | P1 | 按关卡匹配 |
 | 211 | `MATCH_CANCEL` | P1 | 取消匹配 |
 | 300 | `LEVEL_ACTION` | P0 | 提交关卡动作 |
+| 301 | `READY_NEXT_LEVEL` | P0 | 本端已准备进入下一关 |
 | 900 | `ROOM_READY` | P0 | 角色和场景已确定 |
 | 901 | `ROOM_SNAPSHOT` | P0 | 完整房间状态 |
 | 902 | `PLAYER_LEFT` | P1 | 对方离开 |
 | 903 | `MATCH_FOUND` | P1 | 匹配成功 |
+| 904 | `LEVEL_CHANGED` | P0 | 原子切换关卡并携带完整快照 |
 | 999 | `SERVER_ERROR` | P0 | 服务端错误推送 |
 
 ### 6.3 关卡动作
@@ -336,8 +342,20 @@ byte[]     jsonBody      // UTF-8，无 BOM
 | 3004 | 角色无权执行该 action |
 | 3005 | 前置状态不满足 |
 | 3006 | 未知或当前里程碑未实现的 action |
+| 3007 | 当前关卡尚未完成 |
+| 3008 | 当前关卡没有下一关 |
 
-### 6.4 房间快照
+### 6.4 连续换关
+
+- 本关完成后，两端分别提交 `READY_NEXT_LEVEL`。
+- 服务端不使用固定延时，只统计房间内两个账号的准备槽位。
+- 两端均准备后，服务端执行一次 `revision + 1`，创建下一关初始状态。
+- `LEVEL_CHANGED` 同时包含 `fromLevelId`、`toLevelId`、角色、revision
+  和下一关完整快照。
+- 客户端原子更新会话为 `LoadingLevel`，加载完成后应用快照并回到
+  `Playing`。
+
+### 6.5 房间快照
 
 ```json
 {
@@ -417,13 +435,13 @@ byte[]     jsonBody      // UTF-8，无 BOM
 
 ### 7.4 第三关
 
-以下角色按当前 `L3AutoControl` 推导，实施前需要人工确认：
+以下角色已按实际剧情和门缝递送行为确认：
 
 | action | 角色 | 前置状态 | 当前交互入口 | 权威应用 |
 | --- | --- | --- | --- | --- |
 | `PASSWORD_SUCCESS` | Outer | `playing` | `L3/Knock/DoorKnockManager.cs` | `L3Manager.SetPasswordSuccess()` |
 | `METAL_FOUND` | Outer | `passwordSuccess` | `L3/MetalPiece/MetalPiece.cs` | `L3Manager.SetMetalPieceFound()` |
-| `METAL_RECEIVED` | Inner | `metalFound` | `L3/MetalPiece/InsideMetalPiece.cs` | `L3Manager.SetMetalPieceReceived()` |
+| `METAL_RECEIVED` | Outer | `metalFound` | `OurDoorDoorGapOnlineHook.cs` | Inner 端激活门缝铁片 + `L3Manager.SetMetalPieceReceived()` |
 | `WIRE_FOUND` | Inner | `metalReceived` | `L3/WireAndWall/WireExtractTrigger.cs` | `L3Manager.SetWireFound()` |
 | `DOOR_OPENED` | Inner | `wireFound` | `L3/Door/HutongDoorTrigger.cs` | 确定性开门 + `SetDoorOpened()` |
 
@@ -541,7 +559,7 @@ OurDoor 使用纯 C# 客户端和自定义固定消息头，不能直接套用 U
 
 ### M3：第一关权威同步
 
-状态：代码已完成，等待 Lua、Unity EditMode 与双客户端运行验收。
+状态：已完成并通过 Lua、Unity EditMode 与双客户端运行验收。
 
 开发：
 
@@ -568,13 +586,18 @@ OurDoor 使用纯 C# 客户端和自定义固定消息头，不能直接套用 U
 
 ### M4：第二、三关权威同步
 
+状态：代码已完成，等待 Lua、Unity EditMode 与双客户端运行验收。
+
 开发：
 
 - 接入第二关 4 个、第三关 5 个 action。
 - 补齐确定性结果表现。
+- 铁片递送由 Outer 的门缝联网入口确认，Inner 端只呈现最终铁片。
 - 完成连续关卡推进：选择第一关时按 `1→2→3`，选择第二关时按
   `2→3`，选择第三关时只运行第三关；每次换关仍由服务端确认并让
   两端进入相同场景。
+- 换关采用双方显式准备，不使用固定秒数；验收面板可以在通关后手动
+  提交准备以跳过剧情等待。
 
 验证：
 

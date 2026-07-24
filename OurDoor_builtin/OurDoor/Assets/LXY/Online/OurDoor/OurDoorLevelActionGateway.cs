@@ -79,6 +79,15 @@ public static class OurDoorLevelActionGateway
 
     public static void RequestLevel3MetalReceived()
     {
+        if (OnlineActionBridge.IsOnline &&
+            RequireLevel3Manager().MetalPieceReceived)
+        {
+            Debug.Log(
+                "[M4 关卡同步] METAL_RECEIVED 已由服务端确认，" +
+                "Inner 拿起门缝铁片时不重复提交。");
+            return;
+        }
+
         RequestOrApply(3, OurDoorLevelActions.MetalReceived, true, delegate
         {
             RequireLevel3Manager().SetMetalPieceReceived();

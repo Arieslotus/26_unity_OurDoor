@@ -44604,6 +44604,7 @@ GameObject:
   - component: {fileID: 1344646749}
   - component: {fileID: 1344646748}
   - component: {fileID: 1344646753}
+  - component: {fileID: 1344646754}
   m_Layer: 0
   m_Name: OnelineRoot
   m_TagString: Untagged
@@ -44694,13 +44695,29 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1344646747}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 65eca864d229abe49b361789130d5d79, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   onlineController: {fileID: 1344646749}
   duplicateAction: SET_POWER
+  duplicateBoolValue: 1
+  duplicateClientActionId: 
+--- !u!114 &1344646754
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1344646747}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c8fb2f46a6aa8fa459e74c5148da7821, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  onlineController: {fileID: 1344646749}
+  duplicateAction: KEY_FOUND
   duplicateBoolValue: 1
   duplicateClientActionId: 
 --- !u!1 &1346973400
