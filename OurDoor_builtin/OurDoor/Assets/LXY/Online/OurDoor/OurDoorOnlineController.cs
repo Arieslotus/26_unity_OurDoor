@@ -1,5 +1,5 @@
 /// <summary>
-/// 实现功能：组合登录、房间、三关权威同步、连续换关、心跳与退出清理流程。
+/// 实现功能：组合登录、匹配、房间、三关权威同步、连续换关、心跳与退出清理流程。
 /// </summary>
 using System;
 using System.Threading;
@@ -21,6 +21,7 @@ public sealed class OurDoorOnlineController : MonoBehaviour
     private NetworkManager network;
     private AuthService authService;
     private RoomService roomService;
+    private MatchService matchService;
     private LevelActionService levelActionService;
     private LevelFlowService levelFlowService;
     private RoomLifecycleService roomLifecycleService;
@@ -36,6 +37,7 @@ public sealed class OurDoorOnlineController : MonoBehaviour
 
     public NetworkSession Session { get; private set; }
     public int SelectedLevelId { get; private set; }
+    public event Action<MatchFoundDto> MatchFound;
     public event Action<PlayerLeftDto> PlayerLeft;
 
     private void Awake()
@@ -78,11 +80,13 @@ public sealed class OurDoorOnlineController : MonoBehaviour
         Session = new NetworkSession();
         authService = new AuthService(network, Session);
         roomService = new RoomService(network, Session);
+        matchService = new MatchService(network, Session);
         levelActionService = new LevelActionService(network, Session);
         levelFlowService = new LevelFlowService(network, Session);
         roomLifecycleService = new RoomLifecycleService(network, Session);
         heartbeatService = new HeartbeatService(network);
         roomService.RoomReady += OnRoomReady;
+        matchService.MatchFound += OnMatchFound;
         levelFlowService.LevelChanged += OnLevelChanged;
         roomLifecycleService.PlayerLeft += OnPlayerLeft;
         heartbeatService.Failed += OnHeartbeatFailed;
@@ -156,6 +160,29 @@ public sealed class OurDoorOnlineController : MonoBehaviour
         Debug.Log(
             $"[M2 在线控制器] 房间加入成功，roomId={Session.RoomId}, " +
             $"levelId={Session.LevelId}, role={Session.Role}, revision={Session.Revision}。");
+    }
+
+    public async Task<MatchRequestResponse> RequestSelectedMatchAsync()
+    {
+        if (SelectedLevelId == 0)
+        {
+            throw new InvalidOperationException(
+                "[M6 在线控制器] 开始匹配前必须通过选关按钮选择 levelId。");
+        }
+
+        MatchRequestResponse response =
+            await matchService.RequestMatchAsync(
+                SelectedLevelId,
+                cancellation.Token);
+        Debug.Log(
+            $"[M6 在线控制器] 匹配请求完成，levelId={SelectedLevelId}, " +
+            $"queued={response.queued}, state={Session.State}。");
+        return response;
+    }
+
+    public Task<MatchCancelResponse> CancelMatchAsync()
+    {
+        return matchService.CancelMatchAsync(cancellation.Token);
     }
 
     public Task<LevelActionResponse> SubmitLevelActionAsync(
@@ -259,6 +286,14 @@ public sealed class OurDoorOnlineController : MonoBehaviour
             pendingRoomReady = null;
             throw;
         }
+    }
+
+    private void OnMatchFound(MatchFoundDto found)
+    {
+        Debug.Log(
+            $"[M6 在线控制器] 收到匹配结果，roomId={found.roomId}, " +
+            $"levelId={found.levelId}, role={found.role}, revision={found.revision}。");
+        MatchFound?.Invoke(found);
     }
 
     private void OnLevelSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -592,11 +627,13 @@ public sealed class OurDoorOnlineController : MonoBehaviour
         AbortPendingLevelLoad();
         network.ConnectionLost -= OnConnectionLost;
         roomService.RoomReady -= OnRoomReady;
+        matchService.MatchFound -= OnMatchFound;
         levelFlowService.LevelChanged -= OnLevelChanged;
         roomLifecycleService.PlayerLeft -= OnPlayerLeft;
         heartbeatService.Failed -= OnHeartbeatFailed;
         DisposeLoadedLevelBindings();
         roomService.Dispose();
+        matchService.Dispose();
         levelFlowService.Dispose();
         roomLifecycleService.Dispose();
         heartbeatService.Dispose();

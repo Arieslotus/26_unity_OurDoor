@@ -14,6 +14,7 @@ namespace OurDoor.LXY.Networking.Session
         public OnlineSessionState State { get; private set; } = OnlineSessionState.Disconnected;
         public string Uid { get; private set; }
         public string DisplayName { get; private set; }
+        public int MatchingLevelId { get; private set; }
         public string RoomId { get; private set; }
         public int LevelId { get; private set; }
         public string Role { get; private set; }
@@ -68,6 +69,57 @@ namespace OurDoor.LXY.Networking.Session
             Revision = -1;
             Snapshot = null;
             State = OnlineSessionState.WaitingRoom;
+            RaiseChanged();
+        }
+
+        public void BeginMatching(int levelId)
+        {
+            RequireState(OnlineSessionState.Lobby, "开始匹配");
+            ValidateLevelId(levelId);
+            if (MatchingLevelId != 0)
+            {
+                throw new InvalidOperationException(
+                    $"[网络会话] 开始匹配前存在旧的匹配关卡，levelId={MatchingLevelId}。");
+            }
+
+            MatchingLevelId = levelId;
+            State = OnlineSessionState.Matching;
+            RaiseChanged();
+        }
+
+        public void EnterMatchedRoom(
+            string roomId,
+            int levelId,
+            string role,
+            int revision)
+        {
+            RequireState(OnlineSessionState.Matching, "处理 MATCH_FOUND");
+            ValidateRoomIdentity(roomId, levelId, role, revision);
+            if (MatchingLevelId != levelId)
+            {
+                throw new InvalidOperationException(
+                    $"[网络会话] MATCH_FOUND 关卡与匹配请求不一致，" +
+                    $"请求={MatchingLevelId}, 服务端={levelId}。");
+            }
+
+            MatchingLevelId = 0;
+            RoomId = roomId;
+            LevelId = levelId;
+            Role = role;
+            Revision = -1;
+            Snapshot = null;
+            State = OnlineSessionState.WaitingRoom;
+            RaiseChanged();
+        }
+
+        public void CancelMatching()
+        {
+            RequireState(OnlineSessionState.Matching, "结束匹配");
+            if (MatchingLevelId == 0)
+                throw new InvalidOperationException("[网络会话] Matching 状态缺少匹配关卡。");
+
+            MatchingLevelId = 0;
+            State = OnlineSessionState.Lobby;
             RaiseChanged();
         }
 
@@ -239,6 +291,7 @@ namespace OurDoor.LXY.Networking.Session
 
         private void ClearRoomState()
         {
+            MatchingLevelId = 0;
             RoomId = null;
             LevelId = 0;
             Role = null;
@@ -284,6 +337,16 @@ namespace OurDoor.LXY.Networking.Session
                 throw new ArgumentOutOfRangeException(
                     nameof(revision),
                     $"[网络会话] revision 不能小于 0，当前值={revision}。");
+        }
+
+        private static void ValidateLevelId(int levelId)
+        {
+            if (levelId < 1 || levelId > 3)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(levelId),
+                    $"[网络会话] levelId 必须是 1、2、3，当前值={levelId}。");
+            }
         }
 
         private void RequireState(OnlineSessionState expected, string operation)

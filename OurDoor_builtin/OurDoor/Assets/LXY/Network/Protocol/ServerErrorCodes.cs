@@ -23,5 +23,7 @@ namespace OurDoor.LXY.Networking.Protocol
         public const int InvalidAction = 3006;
         public const int LevelNotComplete = 3007;
         public const int NoNextLevel = 3008;
+        public const int AlreadyMatching = 4001;
+        public const int NotMatching = 4002;
     }
 }

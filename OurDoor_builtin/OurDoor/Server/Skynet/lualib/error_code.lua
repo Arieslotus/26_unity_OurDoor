@@ -20,6 +20,8 @@ local error_code = {
     INVALID_ACTION = 3006,
     LEVEL_NOT_COMPLETE = 3007,
     NO_NEXT_LEVEL = 3008,
+    ALREADY_MATCHING = 4001,
+    NOT_MATCHING = 4002,
 }
 
 return error_code

@@ -5,6 +5,7 @@ using System;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.TestTools;
 
 namespace OurDoor.LXY.Networking.Tests
@@ -27,9 +28,13 @@ namespace OurDoor.LXY.Networking.Tests
 
                 Rigidbody body = keyObject.AddComponent<Rigidbody>();
                 Component pickup = keyObject.AddComponent(pickupType);
+                SetUnityEventField(pickupType, pickup, "onPickedUp");
+                SetUnityEventField(pickupType, pickup, "onDropped");
+                InvokeLifecycleMethod(pickupType, pickup, "Awake");
 
                 LogAssert.Expect(LogType.Error, "no XRGrabInteractable on key");
                 Component key = keyObject.AddComponent(keyType);
+                InvokeLifecycleMethod(keyType, key, "Awake");
                 FieldInfo targetPointField = keyType.GetField(
                     "targetPoint",
                     BindingFlags.Instance | BindingFlags.Public);
@@ -68,6 +73,36 @@ namespace OurDoor.LXY.Networking.Tests
             Type type = Type.GetType($"{typeName}, Assembly-CSharp");
             Assert.That(type, Is.Not.Null, $"Assembly-CSharp 中缺少 {typeName}。");
             return type;
+        }
+
+        private static void InvokeLifecycleMethod(
+            Type ownerType,
+            object instance,
+            string methodName)
+        {
+            MethodInfo method = ownerType.GetMethod(
+                methodName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(
+                method,
+                Is.Not.Null,
+                $"{ownerType.Name} 缺少 {methodName} 生命周期方法。");
+            method.Invoke(instance, null);
+        }
+
+        private static void SetUnityEventField(
+            Type ownerType,
+            object instance,
+            string fieldName)
+        {
+            FieldInfo field = ownerType.GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(
+                field,
+                Is.Not.Null,
+                $"{ownerType.Name} 缺少 {fieldName} UnityEvent 字段。");
+            field.SetValue(instance, new UnityEvent());
         }
 
         private static bool ReadPrivateBool(Type ownerType, object instance, string fieldName)

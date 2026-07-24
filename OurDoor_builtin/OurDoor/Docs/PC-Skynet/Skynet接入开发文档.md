@@ -121,7 +121,7 @@ Assets/LXY/
 - `Network/Core`：连接、收发、半包/粘包和主线程队列。
 - `Network/Protocol`：通用消息头、消息 ID、错误码和 DTO。
 - `Network/Session`：登录与房间会话状态。
-- `Network/Services`：临时登录、房间和关卡操作用例；M6 再增加匹配服务。
+- `Network/Services`：临时登录、房间、匹配和关卡操作用例。
 - `NetworkManager`：连接状态、session、请求超时、心跳和推送分发。
 - `Online/OurDoor`：唯一允许引用现有项目代码的适配层。
 - `Tests`：帧解析、协议、状态机和关卡规则测试。
@@ -138,13 +138,14 @@ Server/Skynet/
 │   ├── account_service.lua
 │   ├── lobby_service.lua
 │   ├── room_service.lua
-│   └── match_service.lua（M6）
+│   └── match_service.lua
 ├── lualib/
 │   ├── protocol.lua
 │   ├── packet.lua
 │   ├── error_code.lua
 │   ├── json.lua
-│   └── game_rule.lua（M3）
+│   ├── game_rule.lua（M3）
+│   └── match_queue.lua
 ├── games/（M3-M4）
 │   └── ourdoor/
 │       ├── level_rules.lua
@@ -261,6 +262,30 @@ Disconnected
 - `OnMatchFound`
 
 服务端按 `levelId` 使用 FIFO 队列。配对成功后复用房间创建、角色分配和 `ROOM_READY` 流程，不实现第二套房间逻辑。
+
+客户端在发出请求前从 `Lobby` 进入 `Matching`。匹配响应只确认是否已经
+入队；真正建立房间以 `MATCH_FOUND` 为准：
+
+```json
+{
+  "roomId":"R00001",
+  "levelId":2,
+  "role":"Outer",
+  "revision":1
+}
+```
+
+收到 `MATCH_FOUND` 后进入 `WaitingRoom`。由于 Skynet 的房间推送和匹配
+推送来自不同 service，客户端允许 `ROOM_SNAPSHOT`、`ROOM_READY` 先到达，
+但只能暂存；必须先处理 `MATCH_FOUND` 建立房间身份，再按原顺序应用暂存
+推送。缺失、重复或关卡不一致时直接报错。
+
+匹配错误码：
+
+| code | 含义 |
+| ---: | --- |
+| 4001 | 当前账号已经在匹配队列中 |
+| 4002 | 当前账号不在匹配队列中 |
 
 ## 6. 协议
 
@@ -650,6 +675,14 @@ OurDoor 使用纯 C# 客户端和自定义固定消息头，不能直接套用 U
 - 不同关卡不匹配。
 - 取消、重复请求和掉线不残留队列项。
 - 匹配与房间码加入产生相同房间结构。
+
+实现边界：
+
+- 使用现有选关结果作为 `MATCH_REQUEST.levelId`。
+- 先入队者为 `Outer`，后入队者为 `Inner`。
+- 匹配队列、uid 索引和房间创建由服务端串行处理。
+- 取消或连接清理同时删除 FIFO 项与 uid 索引。
+- 不实现匹配评分、匹配超时、跨关卡匹配或正式账号。
 
 ## 11. 最终验收
 

@@ -1,4 +1,4 @@
-# LXY M5 Skynet 服务端
+# LXY M6 Skynet 服务端
 
 ## M3 必需配置
 
@@ -39,7 +39,7 @@ lxy_port = 8888
 
 ```text
 [M1 Gate] 正在监听 0.0.0.0:8888
-[M2] main 启动完成
+[M6] main 启动完成
 ```
 
 ## Lua 测试
@@ -52,6 +52,8 @@ lxy_port = 8888
 ~/skynet/3rd/lua/lua Server/Skynet/tests/test_level_rules.lua
 ~/skynet/3rd/lua/lua Server/Skynet/tests/test_m4_level_rules.lua
 ~/skynet/3rd/lua/lua Server/Skynet/tests/test_m5_protocol.lua
+~/skynet/3rd/lua/lua Server/Skynet/tests/test_m6_protocol.lua
+~/skynet/3rd/lua/lua Server/Skynet/tests/test_match_queue.lua
 ```
 
 通过标志：
@@ -62,6 +64,8 @@ LXY M2 Lua JSON tests passed
 LXY M3 level rule tests passed
 LXY M4 level rule tests passed
 LXY M5 lifecycle protocol tests passed
+LXY M6 match protocol tests passed
+LXY M6 FIFO match queue tests passed
 ```
 
 ## M2 行为
@@ -112,3 +116,15 @@ LXY M5 lifecycle protocol tests passed
   或加入新房间。
 - 每次清理日志包含 `remainingRooms`、`remainingRoomIndexes` 和
   `remainingAccounts`。对端仍在线时账号数通常为 1；双方都退出后为 0。
+
+## M6 行为
+
+- `MATCH_REQUEST=210`、`MATCH_CANCEL=211`、`MATCH_FOUND=903`。
+- 每个 `levelId` 使用独立 FIFO 队列，不同关卡不会配对。
+- 同关卡先入队者为 `Outer`，后入队者为 `Inner`。
+- 配对时直接调用 M2 的 `CREATE_ROOM` 和 `JOIN_ROOM`，因此房间结构、
+  初始快照、revision 和 `ROOM_READY` 与房间码加入完全一致。
+- 主动取消会删除 FIFO 项和 uid 索引；重复请求返回 `4001`，未在队列时
+  取消返回 `4002`。
+- 连接关闭、socket 异常和心跳超时均先移除匹配项，再执行房间与账号清理。
+- 清理日志额外包含 `matchRemoved` 和 `remainingMatches`。

@@ -27,6 +27,7 @@ namespace OurDoor.LXY.Networking.Services
             _network = network ?? throw new ArgumentNullException(nameof(network));
             _session = session ?? throw new ArgumentNullException(nameof(session));
             _network.PushReceived += OnPushReceived;
+            _session.Changed += OnSessionChanged;
         }
 
         public async Task<string> CreateRoomAsync(
@@ -115,20 +116,50 @@ namespace OurDoor.LXY.Networking.Services
 
             _disposed = true;
             _network.PushReceived -= OnPushReceived;
+            _session.Changed -= OnSessionChanged;
         }
 
         private void OnPushReceived(NetworkEnvelope envelope)
         {
-            if (_roomRequestPending &&
-                _session.State == OnlineSessionState.Lobby &&
-                (envelope.MessageId == MessageIds.RoomSnapshot ||
-                 envelope.MessageId == MessageIds.RoomReady))
+            bool isRoomPush =
+                envelope.MessageId == MessageIds.RoomSnapshot ||
+                envelope.MessageId == MessageIds.RoomReady;
+            bool mustDefer =
+                (_roomRequestPending &&
+                 _session.State == OnlineSessionState.Lobby) ||
+                _session.State == OnlineSessionState.Matching;
+            if (isRoomPush && mustDefer)
             {
                 _deferredRoomPushes.Add(envelope);
                 return;
             }
 
             HandleRoomPush(envelope);
+        }
+
+        private void OnSessionChanged()
+        {
+            if (_deferredRoomPushes.Count == 0 || _roomRequestPending)
+                return;
+            if (_session.State == OnlineSessionState.WaitingRoom)
+            {
+                DrainDeferredRoomPushes();
+                return;
+            }
+            if (_session.State == OnlineSessionState.Lobby)
+            {
+                throw new InvalidOperationException(
+                    $"[房间服务] 匹配已返回 Lobby，但仍有 " +
+                    $"{_deferredRoomPushes.Count} 条房间推送未处理。");
+            }
+            if (_session.State == OnlineSessionState.Disconnected)
+            {
+                int discardedCount = _deferredRoomPushes.Count;
+                _deferredRoomPushes.Clear();
+                Debug.LogWarning(
+                    $"[房间服务] 连接已断开，清除 {discardedCount} 条" +
+                    "尚未建立房间身份的暂存推送。");
+            }
         }
 
         private void HandleRoomPush(NetworkEnvelope envelope)
@@ -180,9 +211,19 @@ namespace OurDoor.LXY.Networking.Services
                 throw new InvalidOperationException("[房间服务] 没有可完成的房间请求。");
 
             _roomRequestPending = false;
+            DrainDeferredRoomPushes();
+        }
+
+        private void DrainDeferredRoomPushes()
+        {
             if (_deferredRoomPushes.Count == 0)
                 return;
-
+            if (_session.State != OnlineSessionState.WaitingRoom)
+            {
+                throw new InvalidOperationException(
+                    $"[房间服务] 处理暂存推送要求状态 WaitingRoom，" +
+                    $"当前={_session.State}, count={_deferredRoomPushes.Count}。");
+            }
             var deferred = _deferredRoomPushes.ToArray();
             _deferredRoomPushes.Clear();
             foreach (var envelope in deferred)

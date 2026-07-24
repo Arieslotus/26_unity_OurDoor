@@ -9,6 +9,7 @@ namespace OurDoor.LXY.Networking.Session
         Connected,
         Authenticating,
         Lobby,
+        Matching,
         WaitingRoom,
         LoadingLevel,
         Playing

@@ -1,5 +1,5 @@
 --- <summary>
---- 实现功能：管理单个 TCP 连接、业务请求、生产心跳、串行推送与统一退出清理。
+--- 实现功能：管理单个 TCP 连接、匹配/房间请求、心跳、串行推送与统一退出清理。
 --- </summary>
 local skynet = require "skynet"
 local socket = require "skynet.socket"
@@ -17,6 +17,7 @@ local account_service
 local lobby_service
 local account
 local room_id
+local matching_level_id
 local write_lock = queue()
 local closing = false
 local close_after_response = false
@@ -111,6 +112,7 @@ local function cleanup_connection(reason)
 
     local cleanup_account = account
     local cleanup_room_id = room_id
+    local cleanup_matching_level_id = matching_level_id
     local errors = {}
     local room_result
     local remaining_accounts
@@ -129,7 +131,7 @@ local function cleanup_connection(reason)
             room_result = room_result_or_error
         else
             errors[#errors + 1] =
-                "room_service=" .. tostring(room_result_or_error)
+                "lobby_cleanup=" .. tostring(room_result_or_error)
         end
 
         local account_ok, account_removed_or_error, account_count = pcall(
@@ -150,6 +152,7 @@ local function cleanup_connection(reason)
 
     account = nil
     room_id = nil
+    matching_level_id = nil
     last_heartbeat_tick = nil
 
     if #errors > 0 then
@@ -167,13 +170,17 @@ local function cleanup_connection(reason)
     end
 
     skynet.error(string.format(
-        "[M5 Agent] 连接清理完成，fd=%d, uid=%s, roomId=%s, "
-            .. "reason=%s, roomRemoved=%s, remainingRooms=%s, "
+        "[M6 Agent] 连接清理完成，fd=%d, uid=%s, roomId=%s, "
+            .. "matchingLevelId=%s, reason=%s, matchRemoved=%s, "
+            .. "remainingMatches=%s, roomRemoved=%s, remainingRooms=%s, "
             .. "remainingRoomIndexes=%s, remainingAccounts=%s",
         fd,
         logged_uid or "未登录",
         cleanup_room_id or "无",
+        cleanup_matching_level_id and tostring(cleanup_matching_level_id) or "无",
         reason,
+        room_result and tostring(room_result.matchRemoved) or "false",
+        room_result and tostring(room_result.remainingMatches) or "未登录",
         room_result and tostring(room_result.removed) or "false",
         room_result and tostring(room_result.remainingRooms) or "未登录",
         room_result and tostring(room_result.remainingRoomIndexes) or "未登录",
@@ -265,6 +272,15 @@ local function handle_create_room(envelope)
         )
         return
     end
+    if matching_level_id then
+        send_business_error(
+            envelope.message_id,
+            envelope.session,
+            error_code.ALREADY_MATCHING,
+            string.format("当前连接正在匹配，levelId=%d", matching_level_id)
+        )
+        return
+    end
 
     local body = decode_request_body(envelope)
     local result = skynet.call(
@@ -294,6 +310,15 @@ local function handle_join_room(envelope)
         )
         return
     end
+    if matching_level_id then
+        send_business_error(
+            envelope.message_id,
+            envelope.session,
+            error_code.ALREADY_MATCHING,
+            string.format("当前连接正在匹配，levelId=%d", matching_level_id)
+        )
+        return
+    end
 
     local body = decode_request_body(envelope)
     local requested_room_id = body.roomId
@@ -310,6 +335,81 @@ local function handle_join_room(envelope)
     )
     if result.code == error_code.OK then
         room_id = result.roomId
+    end
+    send_response(envelope.message_id, envelope.session, result)
+end
+
+local function handle_match_request(envelope)
+    if not require_login(envelope) then
+        return
+    end
+    if room_id then
+        send_business_error(
+            envelope.message_id,
+            envelope.session,
+            error_code.ALREADY_IN_ROOM,
+            string.format("当前连接已在房间中，roomId=%s", room_id)
+        )
+        return
+    end
+    if matching_level_id then
+        send_business_error(
+            envelope.message_id,
+            envelope.session,
+            error_code.ALREADY_MATCHING,
+            string.format("当前连接正在匹配，levelId=%d", matching_level_id)
+        )
+        return
+    end
+
+    local body = decode_request_body(envelope)
+    local result = skynet.call(
+        lobby_service,
+        "lua",
+        "MATCH_REQUEST",
+        account,
+        skynet.self(),
+        body.levelId
+    )
+    if result.code == error_code.OK and result.queued then
+        matching_level_id = result.levelId
+    end
+    send_response(envelope.message_id, envelope.session, result)
+end
+
+local function handle_match_cancel(envelope)
+    if not require_login(envelope) then
+        return
+    end
+    decode_request_body(envelope)
+    if room_id then
+        send_business_error(
+            envelope.message_id,
+            envelope.session,
+            error_code.ALREADY_IN_ROOM,
+            string.format("匹配已经形成房间，roomId=%s", room_id)
+        )
+        return
+    end
+    if not matching_level_id then
+        send_business_error(
+            envelope.message_id,
+            envelope.session,
+            error_code.NOT_MATCHING,
+            "当前连接不在匹配队列中"
+        )
+        return
+    end
+
+    local result = skynet.call(
+        lobby_service,
+        "lua",
+        "MATCH_CANCEL",
+        account,
+        skynet.self()
+    )
+    if result.code == error_code.OK then
+        matching_level_id = nil
     end
     send_response(envelope.message_id, envelope.session, result)
 end
@@ -425,6 +525,8 @@ local request_handlers = {
     [protocol.MESSAGE_ID.CREATE_ROOM] = handle_create_room,
     [protocol.MESSAGE_ID.JOIN_ROOM] = handle_join_room,
     [protocol.MESSAGE_ID.LEAVE_ROOM] = handle_leave_room,
+    [protocol.MESSAGE_ID.MATCH_REQUEST] = handle_match_request,
+    [protocol.MESSAGE_ID.MATCH_CANCEL] = handle_match_cancel,
     [protocol.MESSAGE_ID.LEVEL_ACTION] = handle_level_action,
     [protocol.MESSAGE_ID.READY_NEXT_LEVEL] = handle_ready_next_level,
 }
@@ -517,6 +619,88 @@ skynet.start(function()
     lobby_service = skynet.uniqueservice("lobby_service")
 
     skynet.dispatch("lua", function(_, _, command, ...)
+        if command == "match_found" then
+            local found = ...
+            if type(found) ~= "table"
+                or type(found.roomId) ~= "string"
+                or found.roomId == ""
+                or type(found.levelId) ~= "number"
+                or found.levelId % 1 ~= 0
+                or found.levelId < 1
+                or found.levelId > 3
+                or (found.role ~= "Outer" and found.role ~= "Inner")
+                or type(found.revision) ~= "number"
+                or found.revision % 1 ~= 0
+                or found.revision < 0
+                or type(found.wasQueued) ~= "boolean" then
+                error("[M6 Agent] match_found 缺少合法匹配数据")
+            end
+            if closing then
+                skynet.error(string.format(
+                    "[M6 Agent] 连接清理期间不再发送 MATCH_FOUND，"
+                        .. "fd=%d, uid=%s, roomId=%s",
+                    fd,
+                    logged_uid or "未登录",
+                    found.roomId
+                ))
+                return
+            end
+            if not account then
+                error("[M6 Agent] 未登录连接收到 match_found")
+            end
+            if room_id then
+                error(string.format(
+                    "[M6 Agent] 已在房间时收到 match_found，"
+                        .. "current=%s, found=%s, uid=%s",
+                    room_id,
+                    found.roomId,
+                    account.uid
+                ))
+            end
+            if found.wasQueued then
+                if matching_level_id ~= found.levelId then
+                    error(string.format(
+                        "[M6 Agent] 先入队玩家的匹配关卡不一致，"
+                            .. "local=%s, found=%d, uid=%s",
+                        tostring(matching_level_id),
+                        found.levelId,
+                        account.uid
+                    ))
+                end
+            elseif matching_level_id ~= nil then
+                error(string.format(
+                    "[M6 Agent] 后入队玩家意外存在旧匹配关卡，"
+                        .. "local=%d, found=%d, uid=%s",
+                    matching_level_id,
+                    found.levelId,
+                    account.uid
+                ))
+            end
+
+            matching_level_id = nil
+            room_id = found.roomId
+            send_envelope(
+                protocol.MESSAGE_ID.MATCH_FOUND,
+                0,
+                protocol.MESSAGE_TYPE.PUSH,
+                {
+                    roomId = found.roomId,
+                    levelId = found.levelId,
+                    role = found.role,
+                    revision = found.revision,
+                }
+            )
+            skynet.error(string.format(
+                "[M6 Agent] 已发送 MATCH_FOUND，"
+                    .. "uid=%s, roomId=%s, levelId=%d, role=%s",
+                account.uid,
+                found.roomId,
+                found.levelId,
+                found.role
+            ))
+            return
+        end
+
         if command == "room_closed" then
             local player_left = ...
             if type(player_left) ~= "table"

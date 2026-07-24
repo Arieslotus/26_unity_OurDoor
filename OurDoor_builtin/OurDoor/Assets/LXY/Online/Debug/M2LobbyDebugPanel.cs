@@ -1,5 +1,5 @@
 /// <summary>
-/// 实现功能：提供 M2 双客户端验收所需的临时登录、创建房间、复制房间码和加入房间入口。
+/// 实现功能：提供临时登录、房间码与 M6 按所选关卡匹配的双客户端验收入口。
 /// </summary>
 using System;
 using System.Threading.Tasks;
@@ -42,13 +42,14 @@ public sealed class M2LobbyDebugPanel : MonoBehaviour
         GUILayout.BeginArea(
             new Rect(20f, 20f, width, Screen.height - 40f),
             GUI.skin.box);
-        GUILayout.Label("OurDoor M2 联网验收");
+        GUILayout.Label("OurDoor M2-M6 联网验收");
         GUILayout.Label($"状态：{onlineController.Session.State}");
         GUILayout.Label(
             $"UID：{onlineController.Session.Uid ?? "未登录"}  " +
             $"房间：{onlineController.Session.RoomId ?? "无"}");
         GUILayout.Label(
             $"关卡：{onlineController.Session.LevelId}  " +
+            $"匹配关卡：{onlineController.Session.MatchingLevelId}  " +
             $"角色：{onlineController.Session.Role ?? "未分配"}  " +
             $"Revision：{onlineController.Session.Revision}");
         GUILayout.Label($"最近操作：{lastOperation}");
@@ -144,6 +145,29 @@ public sealed class M2LobbyDebugPanel : MonoBehaviour
         roomId = GUILayout.TextField(roomId);
         if (GUILayout.Button("3B. 加入房间"))
             RunOperation(() => onlineController.JoinRoomAsync(roomId), "加入房间");
+
+        GUILayout.Space(8f);
+        GUI.enabled =
+            !operationRunning &&
+            onlineController.Session.State == OnlineSessionState.Lobby;
+        if (GUILayout.Button("3C. 匹配所选关卡"))
+        {
+            RunOperation(async () =>
+            {
+                await onlineController.RequestSelectedMatchAsync();
+            }, "请求匹配");
+        }
+
+        GUI.enabled =
+            !operationRunning &&
+            onlineController.Session.State == OnlineSessionState.Matching;
+        if (GUILayout.Button("取消匹配"))
+        {
+            RunOperation(async () =>
+            {
+                await onlineController.CancelMatchAsync();
+            }, "取消匹配");
+        }
 
         GUI.enabled = true;
         GUILayout.EndArea();
