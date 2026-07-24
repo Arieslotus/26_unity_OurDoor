@@ -7,6 +7,8 @@ using UnityEngine.SceneManagement;
 
 public static class OurDoorSceneRouter
 {
+    public const string LobbySceneName = "Start_PC";
+
     public static string GetSceneName(int levelId)
     {
         switch (levelId)
@@ -27,13 +29,24 @@ public static class OurDoorSceneRouter
     public static void LoadLevel(int levelId)
     {
         string sceneName = GetSceneName(levelId);
+        RequireLoadableScene(sceneName, $"levelId={levelId}");
+
+        SceneManager.LoadScene(sceneName);
+    }
+
+    public static void LoadLobby()
+    {
+        RequireLoadableScene(LobbySceneName, "返回联网大厅");
+        SceneManager.LoadScene(LobbySceneName);
+    }
+
+    private static void RequireLoadableScene(string sceneName, string source)
+    {
         if (!Application.CanStreamedLevelBeLoaded(sceneName))
         {
             throw new InvalidOperationException(
-                $"[M2 场景路由] 场景未加入 Build Settings 或名称错误，" +
-                $"levelId={levelId}, sceneName={sceneName}。");
+                $"[M5 场景路由] 场景未加入 Build Settings 或名称错误，" +
+                $"source={source}, sceneName={sceneName}。");
         }
-
-        SceneManager.LoadScene(sceneName);
     }
 }

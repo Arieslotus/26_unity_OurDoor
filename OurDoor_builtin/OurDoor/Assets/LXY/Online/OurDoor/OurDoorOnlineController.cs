@@ -1,5 +1,5 @@
 /// <summary>
-/// 实现功能：组合登录、房间、三关权威同步与服务端确认的连续换关流程。
+/// 实现功能：组合登录、房间、三关权威同步、连续换关、心跳与退出清理流程。
 /// </summary>
 using System;
 using System.Threading;
@@ -23,22 +23,43 @@ public sealed class OurDoorOnlineController : MonoBehaviour
     private RoomService roomService;
     private LevelActionService levelActionService;
     private LevelFlowService levelFlowService;
+    private RoomLifecycleService roomLifecycleService;
+    private HeartbeatService heartbeatService;
     private IDisposable levelSynchronizer;
     private OurDoorOnlineLevelFlow onlineLevelFlow;
     private RoomReadyDto pendingRoomReady;
     private LevelChangedDto pendingLevelChanged;
     private Exception levelActionFailure;
     private bool destroying;
+    private bool localLeaveRequested;
+    private bool connectionTerminated;
 
     public NetworkSession Session { get; private set; }
     public int SelectedLevelId { get; private set; }
+    public event Action<PlayerLeftDto> PlayerLeft;
 
     private void Awake()
     {
         if (Instance != null && Instance != this)
         {
+            if (string.Equals(
+                    gameObject.scene.name,
+                    OurDoorSceneRouter.LobbySceneName,
+                    StringComparison.Ordinal))
+            {
+                Debug.Log(
+                    $"[M5 在线控制器] 返回大厅时检测到场景内重复常驻对象，" +
+                    $"保留已有实例并销毁新对象，existing={Instance.gameObject.name}, " +
+                    $"duplicate={gameObject.name}, scene={gameObject.scene.name}。");
+                gameObject.SetActive(false);
+                Destroy(gameObject);
+                return;
+            }
+
             throw new InvalidOperationException(
-                $"[M2 在线控制器] 检测到重复组件，对象={gameObject.name}。");
+                $"[M2 在线控制器] 检测到重复组件，" +
+                $"existing={Instance.gameObject.name}, duplicate={gameObject.name}, " +
+                $"scene={gameObject.scene.name}。");
         }
         if (string.IsNullOrWhiteSpace(clientVersion))
             throw new InvalidOperationException("[M2 在线控制器] Client Version 不能为空。");
@@ -59,8 +80,12 @@ public sealed class OurDoorOnlineController : MonoBehaviour
         roomService = new RoomService(network, Session);
         levelActionService = new LevelActionService(network, Session);
         levelFlowService = new LevelFlowService(network, Session);
+        roomLifecycleService = new RoomLifecycleService(network, Session);
+        heartbeatService = new HeartbeatService(network);
         roomService.RoomReady += OnRoomReady;
         levelFlowService.LevelChanged += OnLevelChanged;
+        roomLifecycleService.PlayerLeft += OnPlayerLeft;
+        heartbeatService.Failed += OnHeartbeatFailed;
         network.ConnectionLost += OnConnectionLost;
     }
 
@@ -75,6 +100,9 @@ public sealed class OurDoorOnlineController : MonoBehaviour
         network.Config.SetEndpoint(host, port);
         await network.ConnectAsync(cancellation.Token);
         Session.MarkConnected();
+        connectionTerminated = false;
+        localLeaveRequested = false;
+        levelActionFailure = null;
         Debug.Log($"[M2 在线控制器] 已连接服务端，host={host}, port={port}。");
     }
 
@@ -85,6 +113,7 @@ public sealed class OurDoorOnlineController : MonoBehaviour
             displayName,
             clientVersion,
             cancellation.Token);
+        heartbeatService.Start(cancellation.Token);
         Debug.Log(
             $"[M2 在线控制器] 临时登录成功，uid={Session.Uid}, " +
             $"displayName={Session.DisplayName}。");
@@ -160,6 +189,41 @@ public sealed class OurDoorOnlineController : MonoBehaviour
         }
 
         return onlineLevelFlow.ReadyNowAsync();
+    }
+
+    public async Task LeaveRoomAsync()
+    {
+        if (localLeaveRequested)
+            throw new InvalidOperationException("[M5 在线控制器] 主动退出正在处理中。");
+
+        localLeaveRequested = true;
+        string leavingRoomId = Session.RoomId;
+        try
+        {
+            LeaveRoomResponse response =
+                await roomLifecycleService.LeaveRoomAsync(cancellation.Token);
+            Debug.Log(
+                $"[M5 在线控制器] 服务端已确认主动退出，" +
+                $"roomId={response.roomId}, uid={Session.Uid}。");
+            HandleConnectionTerminatedOnce(
+                "主动退出房间",
+                null,
+                true);
+            if (network.IsConnected)
+                network.Disconnect();
+        }
+        catch
+        {
+            if (!connectionTerminated)
+                localLeaveRequested = false;
+            throw;
+        }
+        finally
+        {
+            Debug.Log(
+                $"[M5 在线控制器] 主动退出流程结束，" +
+                $"roomId={leavingRoomId ?? "无"}, state={Session.State}。");
+        }
     }
 
     private void OnRoomReady(RoomReadyDto ready)
@@ -327,6 +391,24 @@ public sealed class OurDoorOnlineController : MonoBehaviour
         levelSynchronizer = null;
     }
 
+    private void OnPlayerLeft(PlayerLeftDto playerLeft)
+    {
+        if (playerLeft == null)
+            throw new ArgumentNullException(nameof(playerLeft));
+
+        AbortPendingLevelLoad();
+        DisposeLoadedLevelBindings();
+        ExitOnlineBridge();
+        SelectedLevelId = 0;
+        levelActionFailure = null;
+        Debug.LogWarning(
+            $"[M5 在线控制器] 对端已经离开，本局结束并返回大厅，" +
+            $"roomId={playerLeft.roomId}, leftUid={playerLeft.leftUid}, " +
+            $"reason={playerLeft.reason}, state={Session.State}。");
+        PlayerLeft?.Invoke(playerLeft);
+        LoadLobbyIfNeeded();
+    }
+
     private bool SubmitOnlineIntent(OnlineActionIntent intent)
     {
         if (intent == null)
@@ -395,10 +477,110 @@ public sealed class OurDoorOnlineController : MonoBehaviour
 
     private void OnConnectionLost(Exception exception)
     {
-        Debug.LogError(
-            $"[M2 在线控制器] 网络连接已断开，state={Session.State}, " +
-            $"uid={Session.Uid ?? "未登录"}, roomId={Session.RoomId ?? "无"}, " +
-            $"error={exception}");
+        if (destroying)
+            return;
+
+        if (localLeaveRequested)
+        {
+            Debug.Log(
+                $"[M5 在线控制器] 主动退出后的 TCP 关闭已确认，" +
+                $"detail={exception?.Message ?? "无"}。");
+            HandleConnectionTerminatedOnce(
+                "主动退出后连接关闭",
+                null,
+                true);
+            return;
+        }
+
+        HandleConnectionTerminatedOnce(
+            "网络连接异常关闭",
+            exception,
+            true);
+    }
+
+    private void OnHeartbeatFailed(Exception exception)
+    {
+        if (exception == null)
+            throw new ArgumentNullException(nameof(exception));
+        if (destroying)
+            return;
+
+        HandleConnectionTerminatedOnce("心跳失败", exception, true);
+        if (network.IsConnected)
+            network.Disconnect();
+    }
+
+    private void HandleConnectionTerminatedOnce(
+        string source,
+        Exception exception,
+        bool returnToLobby)
+    {
+        if (connectionTerminated)
+        {
+            Debug.Log(
+                $"[M5 在线控制器] 连接终止清理已完成，忽略重复入口，" +
+                $"source={source}, state={Session.State}。");
+            return;
+        }
+
+        connectionTerminated = true;
+        heartbeatService.Stop();
+        AbortPendingLevelLoad();
+        DisposeLoadedLevelBindings();
+        ExitOnlineBridge();
+        SelectedLevelId = 0;
+
+        string uid = Session.Uid;
+        string roomId = Session.RoomId;
+        OnlineSessionState previousState = Session.State;
+        Session.MarkDisconnected(source);
+
+        if (exception == null)
+        {
+            Debug.Log(
+                $"[M5 在线控制器] 连接已结束，source={source}, " +
+                $"previousState={previousState}, uid={uid ?? "未登录"}, " +
+                $"roomId={roomId ?? "无"}。");
+        }
+        else
+        {
+            Debug.LogError(
+                $"[M5 在线控制器] 连接异常结束，source={source}, " +
+                $"previousState={previousState}, uid={uid ?? "未登录"}, " +
+                $"roomId={roomId ?? "无"}, error={exception}");
+        }
+
+        if (returnToLobby)
+            LoadLobbyIfNeeded();
+    }
+
+    private void AbortPendingLevelLoad()
+    {
+        SceneManager.sceneLoaded -= OnLevelSceneLoaded;
+        pendingRoomReady = null;
+        pendingLevelChanged = null;
+    }
+
+    private static void ExitOnlineBridge()
+    {
+        if (OnlineActionBridge.IsOnline)
+            OnlineActionBridge.ExitOnline();
+    }
+
+    private static void LoadLobbyIfNeeded()
+    {
+        Scene activeScene = SceneManager.GetActiveScene();
+        if (string.Equals(
+                activeScene.name,
+                OurDoorSceneRouter.LobbySceneName,
+                StringComparison.Ordinal))
+        {
+            Debug.Log(
+                $"[M5 在线控制器] 当前已经位于大厅场景，scene={activeScene.name}。");
+            return;
+        }
+
+        OurDoorSceneRouter.LoadLobby();
     }
 
     private void OnDestroy()
@@ -407,20 +589,21 @@ public sealed class OurDoorOnlineController : MonoBehaviour
             return;
 
         destroying = true;
-        SceneManager.sceneLoaded -= OnLevelSceneLoaded;
-        pendingRoomReady = null;
-        pendingLevelChanged = null;
+        AbortPendingLevelLoad();
         network.ConnectionLost -= OnConnectionLost;
         roomService.RoomReady -= OnRoomReady;
         levelFlowService.LevelChanged -= OnLevelChanged;
+        roomLifecycleService.PlayerLeft -= OnPlayerLeft;
+        heartbeatService.Failed -= OnHeartbeatFailed;
         DisposeLoadedLevelBindings();
         roomService.Dispose();
         levelFlowService.Dispose();
+        roomLifecycleService.Dispose();
+        heartbeatService.Dispose();
         cancellation.Cancel();
         levelActionService.Dispose();
         cancellation.Dispose();
-        if (OnlineActionBridge.IsOnline)
-            OnlineActionBridge.ExitOnline();
+        ExitOnlineBridge();
         Instance = null;
     }
 }

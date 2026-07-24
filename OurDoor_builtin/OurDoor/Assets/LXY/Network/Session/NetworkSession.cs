@@ -184,9 +184,66 @@ namespace OurDoor.LXY.Networking.Session
             RaiseChanged();
         }
 
+        public void ApplyPlayerLeft(PlayerLeftDto playerLeft)
+        {
+            if (playerLeft == null)
+                throw new ArgumentNullException(nameof(playerLeft));
+            if (State != OnlineSessionState.WaitingRoom &&
+                State != OnlineSessionState.LoadingLevel &&
+                State != OnlineSessionState.Playing)
+            {
+                throw new InvalidOperationException(
+                    $"[网络会话] 状态 {State} 不允许处理 PLAYER_LEFT。");
+            }
+
+            RequireText(playerLeft.roomId, nameof(playerLeft.roomId));
+            RequireText(playerLeft.leftUid, nameof(playerLeft.leftUid));
+            RequireText(playerLeft.reason, nameof(playerLeft.reason));
+            if (!string.Equals(RoomId, playerLeft.roomId, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"[网络会话] PLAYER_LEFT 房间不一致，" +
+                    $"本地={RoomId}, 服务端={playerLeft.roomId}。");
+            }
+            if (string.Equals(Uid, playerLeft.leftUid, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"[网络会话] PLAYER_LEFT 不应通知离开者本人，uid={Uid}。");
+            }
+
+            ClearRoomState();
+            State = OnlineSessionState.Lobby;
+            RaiseChanged();
+        }
+
+        public void MarkDisconnected(string reason)
+        {
+            RequireText(reason, nameof(reason));
+            if (State == OnlineSessionState.Disconnected)
+            {
+                throw new InvalidOperationException(
+                    $"[网络会话] 会话已经是 Disconnected，不能重复清理，reason={reason}。");
+            }
+
+            Uid = null;
+            DisplayName = null;
+            ClearRoomState();
+            State = OnlineSessionState.Disconnected;
+            RaiseChanged();
+        }
+
         private void ValidateSnapshot(RoomSnapshotDto snapshot)
         {
             ValidateSnapshot(snapshot, LevelId);
+        }
+
+        private void ClearRoomState()
+        {
+            RoomId = null;
+            LevelId = 0;
+            Role = null;
+            Revision = -1;
+            Snapshot = null;
         }
 
         private void ValidateSnapshot(RoomSnapshotDto snapshot, int expectedLevelId)

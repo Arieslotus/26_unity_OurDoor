@@ -1,5 +1,5 @@
 --- <summary>
---- 实现功能：管理单个 TCP 连接，处理登录、房间、关卡操作请求与串行服务端推送。
+--- 实现功能：管理单个 TCP 连接、业务请求、生产心跳、串行推送与统一退出清理。
 --- </summary>
 local skynet = require "skynet"
 local socket = require "skynet.socket"
@@ -18,6 +18,13 @@ local lobby_service
 local account
 local room_id
 local write_lock = queue()
+local closing = false
+local close_after_response = false
+local last_heartbeat_tick
+local logged_uid
+
+local HEARTBEAT_CHECK_TICKS = 100
+local HEARTBEAT_TIMEOUT_TICKS = 30 * 100
 
 local function send_envelope(message_id, session, message_type, body)
     local json_body
@@ -89,11 +96,122 @@ local function require_login(envelope)
     return false
 end
 
+local function cleanup_connection(reason)
+    if closing then
+        skynet.error(string.format(
+            "[M5 Agent] 清理入口已执行，忽略重复调用，"
+                .. "fd=%d, uid=%s, reason=%s",
+            fd,
+            logged_uid or "未登录",
+            reason
+        ))
+        return true
+    end
+    closing = true
+
+    local cleanup_account = account
+    local cleanup_room_id = room_id
+    local errors = {}
+    local room_result
+    local remaining_accounts
+
+    if cleanup_account then
+        local room_ok, room_result_or_error = pcall(
+            skynet.call,
+            lobby_service,
+            "lua",
+            "LEAVE_CONNECTION",
+            cleanup_account,
+            skynet.self(),
+            reason
+        )
+        if room_ok then
+            room_result = room_result_or_error
+        else
+            errors[#errors + 1] =
+                "room_service=" .. tostring(room_result_or_error)
+        end
+
+        local account_ok, account_removed_or_error, account_count = pcall(
+            skynet.call,
+            account_service,
+            "lua",
+            "LOGOUT",
+            skynet.self(),
+            cleanup_account.guest_id
+        )
+        if account_ok then
+            remaining_accounts = account_count
+        else
+            errors[#errors + 1] =
+                "account_service=" .. tostring(account_removed_or_error)
+        end
+    end
+
+    account = nil
+    room_id = nil
+    last_heartbeat_tick = nil
+
+    if #errors > 0 then
+        local error_text = table.concat(errors, " | ")
+        skynet.error(string.format(
+            "[M5 Agent] 连接清理失败，fd=%d, uid=%s, roomId=%s, "
+                .. "reason=%s, errors=%s",
+            fd,
+            logged_uid or "未登录",
+            cleanup_room_id or "无",
+            reason,
+            error_text
+        ))
+        return false, error_text
+    end
+
+    skynet.error(string.format(
+        "[M5 Agent] 连接清理完成，fd=%d, uid=%s, roomId=%s, "
+            .. "reason=%s, roomRemoved=%s, remainingRooms=%s, "
+            .. "remainingRoomIndexes=%s, remainingAccounts=%s",
+        fd,
+        logged_uid or "未登录",
+        cleanup_room_id or "无",
+        reason,
+        room_result and tostring(room_result.removed) or "false",
+        room_result and tostring(room_result.remainingRooms) or "未登录",
+        room_result and tostring(room_result.remainingRoomIndexes) or "未登录",
+        remaining_accounts ~= nil and tostring(remaining_accounts) or "未登录"
+    ))
+    return true
+end
+
 local function handle_heartbeat(envelope)
+    local body = decode_request_body(envelope)
+    if type(body.sequence) ~= "number"
+        or body.sequence % 1 ~= 0
+        or body.sequence < 0 then
+        send_business_error(
+            envelope.message_id,
+            envelope.session,
+            error_code.INVALID_REQUEST,
+            "心跳 sequence 必须是非负整数"
+        )
+        return
+    end
+    if type(body.clientTimeUtcMs) ~= "number" then
+        send_business_error(
+            envelope.message_id,
+            envelope.session,
+            error_code.INVALID_REQUEST,
+            "心跳 clientTimeUtcMs 必须是数字"
+        )
+        return
+    end
+    if account then
+        last_heartbeat_tick = skynet.now()
+    end
+
     send_response(
         protocol.MESSAGE_ID.HEARTBEAT,
         envelope.session,
-        envelope.json_body
+        body
     )
 end
 
@@ -124,6 +242,8 @@ local function handle_guest_login(envelope)
     end
 
     account = logged_account
+    logged_uid = account.uid
+    last_heartbeat_tick = skynet.now()
     send_response(envelope.message_id, envelope.session, {
         code = error_code.OK,
         message = "OK",
@@ -194,6 +314,54 @@ local function handle_join_room(envelope)
     send_response(envelope.message_id, envelope.session, result)
 end
 
+local function handle_leave_room(envelope)
+    if not require_login(envelope) then
+        return
+    end
+
+    local body = decode_request_body(envelope)
+    if type(body.roomId) ~= "string" or body.roomId == "" then
+        send_business_error(
+            envelope.message_id,
+            envelope.session,
+            error_code.INVALID_REQUEST,
+            "LEAVE_ROOM 的 roomId 不能为空"
+        )
+        return
+    end
+    if room_id and body.roomId ~= room_id then
+        send_business_error(
+            envelope.message_id,
+            envelope.session,
+            error_code.NOT_IN_ROOM,
+            string.format(
+                "退出房间与当前房间不一致，request=%s, current=%s",
+                body.roomId,
+                room_id
+            )
+        )
+        return
+    end
+
+    local response_room_id = body.roomId
+    local cleanup_ok, cleanup_error = cleanup_connection("client_leave")
+    if not cleanup_ok then
+        error(string.format(
+            "[M5 Agent] 主动退出清理失败，fd=%d, roomId=%s, error=%s",
+            fd,
+            response_room_id,
+            cleanup_error
+        ))
+    end
+
+    send_response(envelope.message_id, envelope.session, {
+        code = error_code.OK,
+        message = "OK",
+        roomId = response_room_id,
+    })
+    close_after_response = true
+end
+
 local function handle_level_action(envelope)
     if not require_login(envelope) then
         return
@@ -256,6 +424,7 @@ local request_handlers = {
     [protocol.MESSAGE_ID.GUEST_LOGIN] = handle_guest_login,
     [protocol.MESSAGE_ID.CREATE_ROOM] = handle_create_room,
     [protocol.MESSAGE_ID.JOIN_ROOM] = handle_join_room,
+    [protocol.MESSAGE_ID.LEAVE_ROOM] = handle_leave_room,
     [protocol.MESSAGE_ID.LEVEL_ACTION] = handle_level_action,
     [protocol.MESSAGE_ID.READY_NEXT_LEVEL] = handle_ready_next_level,
 }
@@ -307,6 +476,39 @@ local function run()
         end
 
         handle_payload(payload)
+        if close_after_response then
+            return
+        end
+    end
+end
+
+local function heartbeat_watchdog()
+    while not closing do
+        skynet.sleep(HEARTBEAT_CHECK_TICKS)
+        if account
+            and last_heartbeat_tick
+            and skynet.now() - last_heartbeat_tick
+                >= HEARTBEAT_TIMEOUT_TICKS then
+            local elapsed_ticks = skynet.now() - last_heartbeat_tick
+            skynet.error(string.format(
+                "[M5 Agent] 登录后心跳超时，fd=%d, uid=%s, "
+                    .. "elapsedSeconds=%.2f",
+                fd,
+                logged_uid or "未知",
+                elapsed_ticks / 100
+            ))
+            local cleanup_ok, cleanup_error =
+                cleanup_connection("heartbeat_timeout")
+            if not cleanup_ok then
+                skynet.error(string.format(
+                    "[M5 Agent] 心跳超时后的清理存在错误，fd=%d, error=%s",
+                    fd,
+                    cleanup_error
+                ))
+            end
+            socket.shutdown(fd)
+            return
+        end
     end
 end
 
@@ -315,8 +517,65 @@ skynet.start(function()
     lobby_service = skynet.uniqueservice("lobby_service")
 
     skynet.dispatch("lua", function(_, _, command, ...)
+        if command == "room_closed" then
+            local player_left = ...
+            if type(player_left) ~= "table"
+                or type(player_left.roomId) ~= "string"
+                or type(player_left.leftUid) ~= "string"
+                or type(player_left.reason) ~= "string" then
+                error("[M5 Agent] room_closed 缺少合法 PLAYER_LEFT 数据")
+            end
+            if closing then
+                skynet.error(string.format(
+                    "[M5 Agent] 连接清理期间不再发送 PLAYER_LEFT，"
+                        .. "fd=%d, roomId=%s, leftUid=%s",
+                    fd,
+                    player_left.roomId,
+                    player_left.leftUid
+                ))
+                return
+            end
+            if room_id ~= player_left.roomId then
+                error(string.format(
+                    "[M5 Agent] room_closed 与本地房间不一致，"
+                        .. "local=%s, notified=%s, uid=%s",
+                    room_id or "无",
+                    player_left.roomId,
+                    logged_uid or "未登录"
+                ))
+            end
+
+            room_id = nil
+            send_envelope(
+                protocol.MESSAGE_ID.PLAYER_LEFT,
+                0,
+                protocol.MESSAGE_TYPE.PUSH,
+                player_left
+            )
+            skynet.error(string.format(
+                "[M5 Agent] 已向对端发送 PLAYER_LEFT，"
+                    .. "uid=%s, roomId=%s, leftUid=%s, reason=%s",
+                logged_uid or "未登录",
+                player_left.roomId,
+                player_left.leftUid,
+                player_left.reason
+            ))
+            return
+        end
+
         if command ~= "push" then
-            error(string.format("[M2 Agent] 未知服务消息：%s", tostring(command)))
+            error(string.format("[M5 Agent] 未知服务消息：%s", tostring(command)))
+        end
+        if closing then
+            local message_id = ...
+            skynet.error(string.format(
+                "[M5 Agent] 连接清理期间丢弃已无接收方的推送，"
+                    .. "fd=%d, uid=%s, messageId=%s",
+                fd,
+                logged_uid or "未登录",
+                tostring(message_id)
+            ))
+            return
         end
         if not account then
             error(string.format(
@@ -334,6 +593,7 @@ skynet.start(function()
         )
     end)
 
+    skynet.fork(heartbeat_watchdog)
     local ok, reason = xpcall(run, debug.traceback)
     if not ok then
         skynet.error(string.format(
@@ -346,13 +606,25 @@ skynet.start(function()
         ))
     end
 
+    if not closing then
+        local disconnect_reason = ok and "tcp_closed" or "socket_error"
+        local cleanup_ok, cleanup_error =
+            cleanup_connection(disconnect_reason)
+        if not cleanup_ok then
+            skynet.error(string.format(
+                "[M5 Agent] 断线清理存在错误，fd=%d, error=%s",
+                fd,
+                cleanup_error
+            ))
+        end
+    end
     socket.close(fd)
     skynet.error(string.format(
         "[M2 Agent] 客户端已断开，fd=%d, address=%s, uid=%s, roomId=%s",
         fd,
         address,
-        account and account.uid or "未登录",
-        room_id or "无"
+        logged_uid or "未登录",
+        room_id or "已清理"
     ))
     skynet.exit()
 end)

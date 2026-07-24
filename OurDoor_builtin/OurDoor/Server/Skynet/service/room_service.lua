@@ -1,5 +1,5 @@
 --- <summary>
---- 实现功能：管理双人房间、权威状态、action 幂等、revision 与完整快照广播。
+--- 实现功能：管理双人房间、权威状态、幂等 action、完整快照和房间销毁。
 --- </summary>
 local skynet = require "skynet"
 local error_code = require "error_code"
@@ -137,6 +137,14 @@ local function find_player(room, account, agent)
         end
     end
     return nil
+end
+
+local function table_count(values)
+    local count = 0
+    for _ in pairs(values) do
+        count = count + 1
+    end
+    return count
 end
 
 local function action_response(
@@ -297,6 +305,98 @@ function command.JOIN_ROOM(account, agent, room_id)
     ))
     push_room_ready(room)
     return response(error_code.OK, "OK", room, "Inner")
+end
+
+function command.LEAVE_CONNECTION(account, agent, reason)
+    if not validate_account(account, agent) then
+        error("[M5 Room] 清理连接时账号或 agent 身份无效")
+    end
+    if is_blank(reason) then
+        error("[M5 Room] 清理连接时 reason 不能为空")
+    end
+
+    local room_id = room_by_uid[account.uid]
+    if not room_id then
+        local remaining_rooms = table_count(rooms)
+        local remaining_indexes = table_count(room_by_uid)
+        skynet.error(string.format(
+            "[M5 Room] 账号当前不在房间，重复清理不再修改状态，"
+                .. "uid=%s, reason=%s, remainingRooms=%d, remainingRoomIndexes=%d",
+            account.uid,
+            reason,
+            remaining_rooms,
+            remaining_indexes
+        ))
+        return {
+            removed = false,
+            roomId = nil,
+            notifiedCount = 0,
+            remainingRooms = remaining_rooms,
+            remainingRoomIndexes = remaining_indexes,
+        }
+    end
+
+    local room = rooms[room_id]
+    if not room then
+        error(string.format(
+            "[M5 Room] room_by_uid 指向不存在的房间，"
+                .. "uid=%s, roomId=%s, reason=%s",
+            account.uid,
+            room_id,
+            reason
+        ))
+    end
+    if not find_player(room, account, agent) then
+        error(string.format(
+            "[M5 Room] 房间成员与退出连接不匹配，"
+                .. "uid=%s, roomId=%s, agent=%s",
+            account.uid,
+            room_id,
+            skynet.address(agent)
+        ))
+    end
+
+    local survivors = {}
+    for _, player in ipairs(room.players) do
+        room_by_uid[player.uid] = nil
+        if player.uid ~= account.uid then
+            survivors[#survivors + 1] = player
+        end
+    end
+    rooms[room_id] = nil
+
+    for _, survivor in ipairs(survivors) do
+        skynet.send(
+            survivor.agent,
+            "lua",
+            "room_closed",
+            {
+                roomId = room_id,
+                leftUid = account.uid,
+                reason = reason,
+            }
+        )
+    end
+
+    local remaining_rooms = table_count(rooms)
+    local remaining_indexes = table_count(room_by_uid)
+    skynet.error(string.format(
+        "[M5 Room] 房间已销毁，roomId=%s, leftUid=%s, reason=%s, "
+            .. "notified=%d, remainingRooms=%d, remainingRoomIndexes=%d",
+        room_id,
+        account.uid,
+        reason,
+        #survivors,
+        remaining_rooms,
+        remaining_indexes
+    ))
+    return {
+        removed = true,
+        roomId = room_id,
+        notifiedCount = #survivors,
+        remainingRooms = remaining_rooms,
+        remainingRoomIndexes = remaining_indexes,
+    }
 end
 
 function command.SUBMIT_LEVEL_ACTION(

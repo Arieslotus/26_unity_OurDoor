@@ -1,4 +1,4 @@
-# LXY M4 Skynet 服务端
+# LXY M5 Skynet 服务端
 
 ## M3 必需配置
 
@@ -51,6 +51,7 @@ lxy_port = 8888
 ~/skynet/3rd/lua/lua Server/Skynet/tests/test_json.lua
 ~/skynet/3rd/lua/lua Server/Skynet/tests/test_level_rules.lua
 ~/skynet/3rd/lua/lua Server/Skynet/tests/test_m4_level_rules.lua
+~/skynet/3rd/lua/lua Server/Skynet/tests/test_m5_protocol.lua
 ```
 
 通过标志：
@@ -60,6 +61,7 @@ LXY M1 Lua packet tests passed
 LXY M2 Lua JSON tests passed
 LXY M3 level rule tests passed
 LXY M4 level rule tests passed
+LXY M5 lifecycle protocol tests passed
 ```
 
 ## M2 行为
@@ -73,8 +75,7 @@ LXY M4 level rule tests passed
   `ROOM_READY`。
 - 错误房间码、第三人加入和非法 levelId 返回明确业务错误。
 
-退出清理和账号释放属于 M5。M2 期间重新运行相同测试时应使用新的
-guestId，或者重启 Skynet 服务端。
+退出清理和账号释放已在 M5 完成。
 
 ## M3 行为
 
@@ -99,3 +100,15 @@ guestId，或者重启 Skynet 服务端。
 - `LEVEL_CHANGED=904` 在一个推送中携带目标关卡和完整初始快照，避免
   客户端先后收到关卡号与快照造成中间状态。
 - 选择第一关按 `1→2→3`，选择第二关按 `2→3`，选择第三关不再换关。
+
+## M5 行为
+
+- `LEAVE_ROOM=202`，`PLAYER_LEFT=902`。
+- 登录后 30 秒没有收到有效心跳即按超时退出处理。
+- 主动退出、TCP 关闭、socket 异常和心跳超时进入同一个清理函数。
+- 一人退出即删除房间、关卡状态和双方房间索引。
+- 只释放离开者临时账号；对端账号和连接继续保留。
+- 对端 agent 清除本地房间号后只推送一次 `PLAYER_LEFT`，随后可以创建
+  或加入新房间。
+- 每次清理日志包含 `remainingRooms`、`remainingRoomIndexes` 和
+  `remainingAccounts`。对端仍在线时账号数通常为 1；双方都退出后为 0。

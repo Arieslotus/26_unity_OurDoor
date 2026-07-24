@@ -82,7 +82,8 @@ Assets/LXY/
 │   │   ├── ProtocolDtos.cs
 │   │   ├── LobbyDtos.cs
 │   │   ├── LevelActionDtos.cs
-│   │   └── LevelFlowDtos.cs
+│   │   ├── LevelFlowDtos.cs
+│   │   └── RoomLifecycleDtos.cs
 │   ├── Session/
 │   │   ├── NetworkSession.cs
 │   │   └── OnlineSessionState.cs
@@ -90,7 +91,9 @@ Assets/LXY/
 │   │   ├── AuthService.cs
 │   │   ├── RoomService.cs
 │   │   ├── LevelActionService.cs
-│   │   └── LevelFlowService.cs
+│   │   ├── LevelFlowService.cs
+│   │   ├── RoomLifecycleService.cs
+│   │   └── HeartbeatService.cs
 │   ├── NetworkManager.cs
 │   └── NetworkConfig.cs
 ├── Online/
@@ -107,7 +110,8 @@ Assets/LXY/
 │   └── Debug/
 │       ├── M2LobbyDebugPanel.cs
 │       ├── M3Level1DebugPanel.cs
-│       └── M4LevelDebugPanel.cs
+│       ├── M4LevelDebugPanel.cs
+│       └── M5ExitDebugPanel.cs
 └── Tests/
     └── EditMode/
 ```
@@ -473,7 +477,9 @@ agent 标记 closing
   → 关闭连接并退出 agent
 ```
 
-清理接口必须幂等。一人离开即结束本局，对端返回大厅，不等待重连。
+清理接口必须幂等。一人离开即结束本局，对端保留登录和 TCP 连接，
+清除房间态后返回 `Start_PC`，不等待重连。主动退出者释放临时账号并
+关闭 TCP。
 
 ## 9. UnityMMO 参考项目
 
@@ -586,7 +592,9 @@ OurDoor 使用纯 C# 客户端和自定义固定消息头，不能直接套用 U
 
 ### M4：第二、三关权威同步
 
-状态：代码已完成，等待 Lua、Unity EditMode 与双客户端运行验收。
+状态：联网、换关、第三关门缝与最终状态流程已通过验收。完整游戏交互
+验收暂缓；已知遗留为第二关 Inner 真实拿钥匙未触发 `KEY_FOUND`，后续
+单独修复并补测，不阻塞 M5。
 
 开发：
 
@@ -607,16 +615,26 @@ OurDoor 使用纯 C# 客户端和自定义固定消息头，不能直接套用 U
 
 ### M5：退出与清理（P1）
 
+状态：代码已完成，等待 Lua、Unity EditMode 与双客户端运行验收。
+
 开发：
 
-- 统一主动退出、socket 异常和心跳超时清理。
-- 完成 `PLAYER_LEFT`。
+- `LEAVE_ROOM=202`；`PLAYER_LEFT=902`。
+- 客户端登录成功后立即发送心跳，之后每 10 秒发送一次。
+- 服务端登录后连续 30 秒没有有效心跳时执行超时清理。
+- 主动退出、TCP 正常关闭、socket 异常和心跳超时使用同一幂等清理入口。
+- 一人离开即销毁房间、双方房间索引和关卡状态，只释放离开者临时账号。
+- 对端只收到一次 `PLAYER_LEFT`，保留登录和连接并返回 `Start_PC`。
+- 主动退出者收到响应后断开连接，会话进入 `Disconnected`。
 
 验证：
 
-- 在等待房间、加载和游玩阶段分别关闭一端。
+- 在等待房间、加载和游玩阶段分别主动退出或关闭一端。
 - 对端只收到一次通知。
-- 服务端无账号、房间和 agent 残留。
+- 对端进入 `Lobby`、返回 `Start_PC`，并可直接重新创建房间。
+- 原房间码不可加入，退出者 guestId 可以重新登录。
+- 服务端日志中的房间、索引和账号计数正确；双方最终退出后均为 0。
+- 每个关闭连接对应的 agent 输出断开日志并退出。
 
 ### M6：匹配（P1）
 
@@ -652,7 +670,6 @@ OurDoor 使用纯 C# 客户端和自定义固定消息头，不能直接套用 U
 
 ## 12. 后续待确认项
 
-1. M5 对端退出后返回 `Start_PC`，还是停留当前场景显示结束面板。
-2. 部署使用的 Skynet 地址、端口、防火墙和 Linux 启动方式。
+1. 部署使用的 Skynet 地址、端口、防火墙和 Linux 启动方式。
 
 以上配置不在代码中自动修改。
